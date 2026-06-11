@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Newsreader", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-bg-light: #FAF9F6;
+  --color-surface-light: #FFFFFF;
+  --color-text-light: #1B1B18;
+  --color-muted-light: #706F68;
+  --color-border-light: rgba(27, 27, 24, 0.08);
+  --color-accent-light: #5A7065;
+  --color-accent-hover-light: #4A5C53;
+  --color-accent-bg-light: rgba(90, 112, 101, 0.08);
+  --color-grid-light: rgba(27, 27, 24, 0.05);
+
+  --color-bg-dark: #141412;
+  --color-surface-dark: #1C1C1A;
+  --color-text-dark: #E5E5E0;
+  --color-muted-dark: #96958E;
+  --color-border-dark: rgba(229, 229, 224, 0.08);
+  --color-accent-dark: #8CA397;
+  --color-accent-hover-dark: #9FB5AA;
+  --color-accent-bg-dark: rgba(140, 163, 151, 0.08);
+  --color-grid-dark: rgba(229, 229, 224, 0.04);
+}
+
+:root {
+  --bg: #FAF9F6;
+  --surface: #FFFFFF;
+  --text: #1B1B18;
+  --muted: #706F68;
+  --border: rgba(27, 27, 24, 0.08);
+  --accent: #5A7065;
+  --accent-hover: #4A5C53;
+  --accent-bg: rgba(90, 112, 101, 0.08);
+  --grid: rgba(27, 27, 24, 0.05);
+}
+
+:root.dark {
+  --bg: #141412;
+  --surface: #1C1C1A;
+  --text: #E5E5E0;
+  --muted: #96958E;
+  --border: rgba(229, 229, 224, 0.08);
+  --accent: #8CA397;
+  --accent-hover: #9FB5AA;
+  --accent-bg: rgba(140, 163, 151, 0.08);
+  --grid: rgba(229, 229, 224, 0.04);
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  overflow-x: hidden;
+  /* keep body from showing a separate scrollbar; make #root handle scrolling */
+  overflow-y: hidden;
+}
+
+/* Make the app root the single scroll container */
+#root {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(0deg, var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 1;
+  transition: background-image 200ms ease;
+}
+
+/* Custom transitions and soft animations */
+.fade-in {
+  animation: fadeIn 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 99px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Workflow flow animation */
+.flow-line {
+  position: relative;
+  height: 6px;
+  background: linear-gradient(90deg, rgba(140,163,151,0.18), rgba(140,163,151,0.06));
+  border-radius: 999px;
+  overflow: hidden;
+}
+.flow-dot {
+  position: absolute;
+  top: 50%;
+  left: -12px;
+  width: 12px;
+  height: 12px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  animation: flowMove 3.6s linear infinite;
+}
+
+@keyframes flowMove {
+  0% { left: -12px; opacity: 0; transform: translateY(-50%) scale(0.8); }
+  10% { opacity: 1; }
+  50% { left: 50%; opacity: 1; transform: translateY(-50%) scale(1); }
+  90% { opacity: 0.6; }
+  100% { left: 100%; opacity: 0; transform: translateY(-50%) scale(0.8); }
+}
+
+/* small fade-in stagger helper */
+.stagger-fade { opacity: 0; transform: translateY(6px); animation: staggerIn 600ms forwards; }
+@keyframes staggerIn { to { opacity: 1; transform: translateY(0); } }

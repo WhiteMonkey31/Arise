@@ -2,13 +2,13 @@
 
 Version: 1.0
 Date: 2026-06-11
-Project: Cust — RFP / Proposal Engine (Frontend + API + Worker)
+Project: Arise — RFP / Proposal Engine (Frontend + API + Worker)
 
 ---
 
 ## 1. Purpose
 
-This document specifies the system-level requirements, data models, API contracts, data flows, event shapes, and integration points for the Cust proposal engine project. It is intended for frontend and backend engineers, integration partners, and DevOps.
+This document specifies the system-level requirements, data models, API contracts, data flows, event shapes, and integration points for the Arise proposal engine project. It is intended for frontend and backend engineers, integration partners, and DevOps.
 
 ## 2. Scope
 
