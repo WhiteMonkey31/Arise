@@ -1,0 +1,1 @@
+// React Query hook wrapping workspaceService. Returns workspace data, loading/error state, and mutation functions (create, update, delete).

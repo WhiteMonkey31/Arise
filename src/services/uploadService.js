@@ -1,0 +1,1 @@
+// Multipart file upload to /api/workspaces/{id}/upload. Returns job_id for polling. Tracks upload progress via onUploadProgress.

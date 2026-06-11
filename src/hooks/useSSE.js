@@ -1,0 +1,1 @@
+// Generic SSE hook. Opens EventSource on a given URL, handles incoming message events, cleans up on unmount. Used for streaming AI text and extraction progress.

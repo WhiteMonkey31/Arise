@@ -1,0 +1,1 @@
+// React Query hook for proposal sections. Exposes approveMutation, rejectMutation, regenerateMutation, and saveEditMutation.

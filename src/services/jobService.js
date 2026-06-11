@@ -1,0 +1,1 @@
+// Poll Celery job status by job_id. Returns {status, progress, result}. Used by ExtractionProgress component.

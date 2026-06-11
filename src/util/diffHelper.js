@@ -1,0 +1,1 @@
+// Computes character-level diff between two strings for VersionHistory. Returns array of {type: add|remove|equal, value} segments.

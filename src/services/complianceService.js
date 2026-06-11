@@ -1,0 +1,1 @@
+// etch compliance checklist per workspace. Patch individual item status (override PASS/FAIL/GAP). Fetch matched capability evidence for a requirement.
