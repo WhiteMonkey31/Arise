@@ -1,0 +1,79 @@
+# ============================================================
+# RFP Bid Management System — Python Dependencies
+# Pinned versions for reproducible builds
+# ============================================================
+
+# ---- Web Framework ----
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+starlette==0.41.3
+python-multipart==0.0.18
+
+# ---- Pydantic / Settings ----
+pydantic==2.10.3
+pydantic-settings==2.6.1
+pydantic-core==2.27.1
+
+# ---- Database ----
+sqlmodel==0.0.22
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# ---- Authentication ----
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+
+# ---- AI — Anthropic (Claude) ----
+anthropic==0.40.0
+
+# ---- AI — OpenAI (GPT-4o + Embeddings) ----
+openai==1.57.2
+
+# ---- AI — Cohere (Reranking) ----
+cohere==5.13.5
+
+# ---- LangChain ----
+langchain==0.3.12
+langchain-community==0.3.12
+langchain-openai==0.2.12
+langchain-anthropic==0.3.3
+
+# ---- Vector Store ----
+chromadb==0.6.2
+
+# ---- Document Processing ----
+PyMuPDF==1.24.14
+python-docx==1.1.2
+openpyxl==3.1.5
+
+# ---- Data Processing ----
+pandas==2.2.3
+numpy==1.26.4
+
+# ---- Task Queue ----
+celery[redis]==5.4.0
+redis==5.2.1
+
+# ---- AWS S3 (optional) ----
+boto3==1.35.93
+botocore==1.35.93
+
+# ---- Logging ----
+loguru==0.7.3
+
+# ---- HTTP Client ----
+httpx==0.28.1
+aiohttp==3.11.10
+
+# ---- Utilities ----
+python-dotenv==1.0.1
+tenacity==9.0.0
+
+# ---- Testing ----
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+httpx==0.28.1
+anyio==4.7.0
