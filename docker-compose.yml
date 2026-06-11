@@ -1,0 +1,245 @@
+version: "3.9"
+
+# ============================================================
+# RFP Bid Management System — Docker Compose
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # PostgreSQL 15
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: rfp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rfpuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rfppassword}
+      POSTGRES_DB: ${POSTGRES_DB:-rfpdb}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rfpuser} -d ${POSTGRES_DB:-rfpdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - rfp_net
+
+  # ----------------------------------------------------------
+  # Redis 7
+  # ----------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: rfp_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rfp_net
+
+  # ----------------------------------------------------------
+  # ChromaDB
+  # ----------------------------------------------------------
+  chromadb:
+    image: ghcr.io/chroma-core/chroma:latest
+    container_name: rfp_chromadb
+    restart: unless-stopped
+    environment:
+      CHROMA_SERVER_HOST: 0.0.0.0
+      CHROMA_SERVER_HTTP_PORT: 8001
+      ANONYMIZED_TELEMETRY: "false"
+    ports:
+      - "8001:8001"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/api/v1/heartbeat || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      - rfp_net
+
+  # ----------------------------------------------------------
+  # FastAPI Backend
+  # ----------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rfp_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rfpuser}:${POSTGRES_PASSWORD:-rfppassword}@postgres:5432/${POSTGRES_DB:-rfpdb}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: "8001"
+    volumes:
+      - ./backend:/app
+      - upload_data:/tmp/rfp_uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - rfp_net
+
+  # ----------------------------------------------------------
+  # Celery Worker — Extract queue
+  # ----------------------------------------------------------
+  celery_extract:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rfp_celery_extract
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app.celery_app worker -Q extract --loglevel=info --concurrency=2
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rfpuser}:${POSTGRES_PASSWORD:-rfppassword}@postgres:5432/${POSTGRES_DB:-rfpdb}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: "8001"
+    volumes:
+      - ./backend:/app
+      - upload_data:/tmp/rfp_uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rfp_net
+
+  # ----------------------------------------------------------
+  # Celery Worker — Match queue
+  # ----------------------------------------------------------
+  celery_match:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rfp_celery_match
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app.celery_app worker -Q match --loglevel=info --concurrency=2
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rfpuser}:${POSTGRES_PASSWORD:-rfppassword}@postgres:5432/${POSTGRES_DB:-rfpdb}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: "8001"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    networks:
+      - rfp_net
+
+  # ----------------------------------------------------------
+  # Celery Worker — Draft queue
+  # ----------------------------------------------------------
+  celery_draft:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rfp_celery_draft
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app.celery_app worker -Q draft --loglevel=info --concurrency=1
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rfpuser}:${POSTGRES_PASSWORD:-rfppassword}@postgres:5432/${POSTGRES_DB:-rfpdb}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CHROMADB_HOST: chromadb
+      CHROMADB_PORT: "8001"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rfp_net
+
+  # ----------------------------------------------------------
+  # Frontend (Vite)
+  # ----------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: rfp_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - rfp_net
+
+# ----------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  chromadb_data:
+    driver: local
+  upload_data:
+    driver: local
+
+# ----------------------------------------------------------
+# Networks
+# ----------------------------------------------------------
+networks:
+  rfp_net:
+    driver: bridge
