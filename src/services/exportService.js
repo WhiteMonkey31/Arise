@@ -1,0 +1,1 @@
+// Trigger DOCX export for a workspace. Downloads the returned blob as a .docx file.

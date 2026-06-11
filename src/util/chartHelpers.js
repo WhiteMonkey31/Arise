@@ -1,0 +1,1 @@
+// Transforms raw API scoring data into Recharts-compatible series format for radar, bar, scatter, and line charts.

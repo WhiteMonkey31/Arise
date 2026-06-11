@@ -1,0 +1,1 @@
+// Custom hook that polls jobService every 2s until job reaches done/failed. Returns {status, progress}. Stops polling automatically.

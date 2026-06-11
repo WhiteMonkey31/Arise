@@ -1,0 +1,1 @@
+// Recharts BarChart showing win rate per sector. X-axis: sector names. Y-axis: win %. Tooltip shows win/total bids. Clicking a bar filters the rest of the analytics page.

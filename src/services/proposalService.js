@@ -1,0 +1,1 @@
+// Fetch draft sections, approve/reject/regenerate a section, save edited text, stream AI regeneration via SSE EventSource.

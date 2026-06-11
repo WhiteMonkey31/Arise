@@ -1,0 +1,1 @@
+// CRUD for capability library records. Batch import from XLSX. Fetch capabilities linked to a specific proposal section.

@@ -1,0 +1,1 @@
+// App-wide constants: sector list, RFP status enum, compliance status enum, score axis labels, max file size, API base URL env var.
