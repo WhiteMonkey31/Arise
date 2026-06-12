@@ -3,23 +3,14 @@ import { Link, useNavigate } from "react-router";
 import { useAuthStore } from "../store/authStore";
 
 const Header = (token) => {
-
-
   return (
     <header className="border-b border-(--border) fixed w-full top-0 bg-white/55 backdrop-blur-sm z-30 transition-all duration-200">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-xl bg-(--accent) flex items-center justify-center text-white font-serif font-semibold text-lg shadow-sm">
-            A
-          </div>
-          <div>
-            <h1 className="font-serif font-bold text-lg leading-none tracking-tight">
-              Arise
-            </h1>
-            <span className="text-[9px] uppercase font-bold tracking-wider text-(--muted)">
-              RFP Engine
-            </span>
-          </div>
+          <img src="/logo.svg" alt="logo" className="size-10" />
+          <span className="text-xl uppercase font-bold tracking-wider text-(--muted)">
+            RFPilot
+          </span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -66,7 +57,7 @@ const Hero = () => {
           minutes.
         </h2>
         <p className="text-sm md:text-base text-(--muted) leading-relaxed font-medium max-w-xl text-balance">
-          Arise analyzes complex government and commercial RFP documents,
+          RFPilot analyzes complex government and commercial RFP documents,
           extracts mandatory compliance items, maps capability certifications,
           and generates ready-to-submit proposal drafts automatically.
         </p>
@@ -405,12 +396,12 @@ export const Footer = () => {
             A
           </div>
           <span className="font-serif font-bold text-sm text-(--text)">
-            Arise
+            RFPilot
           </span>
         </div>
 
         <p className="text-[10px] font-bold uppercase tracking-wider text-(--muted) font-sans">
-          © 2026 Arise Inc. All rights reserved. Bid Response Engine.
+          © 2026 RFPilot Inc. All rights reserved. Bid Response Engine.
         </p>
       </div>
     </footer>

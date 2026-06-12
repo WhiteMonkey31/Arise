@@ -1,9 +1,9 @@
 /* Custom utilities for soft, clean UI */
-/* .app-root {
+.app-root {
   position: relative;
   min-height: 100vh;
   z-index: 1;
-} */
+}
 
 .glow-hover {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);

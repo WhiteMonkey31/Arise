@@ -86,7 +86,7 @@ export default function WinRadarChart({ scoreBreakdown }) {
         {/* Actual Score Area */}
         <polygon
           points={scorePoints}
-          className="fill-[var(--accent)]/10 dark:fill-[var(--accent)]/5 stroke-[var(--accent)]"
+          className="fill-(--accent)/10 dark:fill-(--accent)/5 stroke-(--accent)"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -102,7 +102,7 @@ export default function WinRadarChart({ scoreBreakdown }) {
               x={outerCoord.x + offset.x}
               y={outerCoord.y + offset.y}
               textAnchor={offset.align}
-              className="fill-[var(--text)] text-[9px] font-bold tracking-tight uppercase"
+              className="fill-(--text) text-[9px] font-bold tracking-tight uppercase"
             >
               {item.name}
             </text>

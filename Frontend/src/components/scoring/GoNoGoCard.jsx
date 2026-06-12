@@ -27,27 +27,27 @@ export default function GoNoGoCard({ workspace }) {
   }
 
   return (
-    <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 md:p-8 shadow-sm space-y-6 select-none">
+    <div className="rounded-3xl border border-(--border)) bg-(--surface)) p-6 md:p-8 shadow-sm space-y-6 select-none">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[var(--border)] pb-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-(--border)) pb-5">
         <div>
-          <h3 className="font-serif font-bold text-lg text-[var(--text)]">GO / NO-GO Advisory</h3>
-          <p className="text-xs text-[var(--muted)] font-medium font-sans mt-0.5">Calculated by aligning RFP values with past performance metrics.</p>
+          <h3 className="font-serif font-bold text-lg text-(--text))">GO / NO-GO Advisory</h3>
+          <p className="text-xs text-(--muted)) font-medium font-sans mt-0.5">Calculated by aligning RFP values with past performance metrics.</p>
         </div>
 
         {/* Score gauge badge */}
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-[var(--muted)]">Overall score:</span>
-          <span className="rounded-2xl bg-[var(--accent-bg)] border border-[var(--border)] px-4 py-2 text-sm sm:text-base font-bold text-[var(--accent)] font-serif">
+          <span className="text-xs font-bold text-(--muted))">Overall score:</span>
+          <span className="rounded-2xl bg-(--accent-bg)) border border-(--border)) px-4 py-2 text-sm sm:text-base font-bold text-(--accent)) font-serif">
             {workspace.winProbability} / 100
           </span>
         </div>
       </div>
 
       {/* AI Reasoning summary quotes block */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--accent-bg)] p-4 sm:p-5">
-        <span className="text-[9px] uppercase font-bold tracking-wider text-[var(--accent)] block mb-2">Advisory Reasoning</span>
-        <p className="font-serif italic text-xs sm:text-[13px] leading-relaxed text-[var(--text)]">
+      <div className="rounded-2xl border border-(--border)) bg-(--accent-bg)) p-4 sm:p-5">
+        <span className="text-[9px) uppercase font-bold tracking-wider text-(--accent)) block mb-2">Advisory Reasoning</span>
+        <p className="font-serif italic text-xs sm:text-[13px) leading-relaxed text-(--text))">
           "{workspace.aiReasoning}"
         </p>
       </div>
@@ -56,11 +56,11 @@ export default function GoNoGoCard({ workspace }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
         {/* Strengths */}
         <div className="space-y-3">
-          <span className="text-[9px] uppercase font-bold tracking-wider text-emerald-600 flex items-center gap-1.5 font-sans">
+          <span className="text-[9px) uppercase font-bold tracking-wider text-emerald-600 flex items-center gap-1.5 font-sans">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
             Top Strengths
           </span>
-          <ul className="space-y-2.5 text-xs text-[var(--text)] font-medium leading-relaxed font-sans">
+          <ul className="space-y-2.5 text-xs text-(--text)) font-medium leading-relaxed font-sans">
             {workspace.strengths.map((str, idx) => (
               <li key={idx} className="flex gap-2">
                 <span className="text-emerald-500 font-bold">•</span>
@@ -72,11 +72,11 @@ export default function GoNoGoCard({ workspace }) {
 
         {/* Risks */}
         <div className="space-y-3">
-          <span className="text-[9px] uppercase font-bold tracking-wider text-red-600 flex items-center gap-1.5 font-sans">
+          <span className="text-[9px) uppercase font-bold tracking-wider text-red-600 flex items-center gap-1.5 font-sans">
             <span className="h-2 w-2 rounded-full bg-red-500" />
             Core Risks
           </span>
-          <ul className="space-y-2.5 text-xs text-[var(--text)] font-medium leading-relaxed font-sans">
+          <ul className="space-y-2.5 text-xs text-(--text)) font-medium leading-relaxed font-sans">
             {workspace.risks.map((risk, idx) => (
               <li key={idx} className="flex gap-2">
                 <span className="text-red-500 font-bold">•</span>
@@ -88,18 +88,18 @@ export default function GoNoGoCard({ workspace }) {
       </div>
 
       {/* Buttons */}
-      <div className="flex items-center justify-end gap-2.5 border-t border-[var(--border)] pt-5 mt-4">
+      <div className="flex items-center justify-end gap-2.5 border-t border-(--border)) pt-5 mt-4">
         <button
           type="button"
           onClick={() => handleDecisionClick('NO-GO')}
-          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 hover:border-red-200 transition cursor-pointer"
+          className="rounded-xl border border-(--border)) bg-(--surface)) px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 hover:border-red-200 transition cursor-pointer"
         >
           No-Go (Archive)
         </button>
         <button
           type="button"
           onClick={() => handleDecisionClick('GO')}
-          className="rounded-xl bg-[var(--accent)] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-95 transition cursor-pointer"
+          className="rounded-xl bg-(--accent)) px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-95 transition cursor-pointer"
         >
           Go (Submit Bid)
         </button>

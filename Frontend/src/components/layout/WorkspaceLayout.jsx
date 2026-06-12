@@ -17,10 +17,10 @@ export default function WorkspaceLayout() {
 
   if (!activeWorkspace) {
     return (
-      <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-8 text-center shadow-sm max-w-lg mx-auto mt-12 fade-in">
-        <h2 className="font-serif font-bold text-lg text-[var(--text)]">Workspace Not Found</h2>
-        <p className="text-xs text-[var(--muted)] mt-2">The requested workspace does not exist or has been deleted.</p>
-        <Link to="/dashboard" className="inline-flex items-center justify-center mt-5 rounded-2xl bg-[var(--accent)] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-95">
+      <div className="rounded-3xl border border-(--border) bg-(--surface) p-8 text-center shadow-sm max-w-lg mx-auto mt-12 fade-in">
+        <h2 className="font-serif font-bold text-lg text-(--text)">Workspace Not Found</h2>
+        <p className="text-xs text-(--muted) mt-2">The requested workspace does not exist or has been deleted.</p>
+        <Link to="/dashboard" className="inline-flex items-center justify-center mt-5 rounded-2xl bg-(--accent) px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-95">
           Return to Dashboard
         </Link>
       </div>
@@ -39,24 +39,24 @@ export default function WorkspaceLayout() {
   return (
     <div className="space-y-6 fade-in">
       {/* Workspace Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-[var(--border)] pb-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-(--border) pb-5">
         <div>
-          <h2 className="font-serif font-bold text-xl sm:text-2xl text-[var(--text)] leading-snug tracking-tight">
+          <h2 className="font-serif font-bold text-xl sm:text-2xl text-(--text) leading-snug tracking-tight">
             {activeWorkspace.name}
           </h2>
-          <div className="flex flex-wrap gap-2 items-center text-xs text-[var(--muted)] mt-2 font-medium">
-            <span className="rounded-full bg-[var(--accent-bg)] border border-[var(--border)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--accent)]">
+          <div className="flex flex-wrap gap-2 items-center text-xs text-(--muted) mt-2 font-medium">
+            <span className="rounded-full bg-(--accent-bg) border border-(--border) px-2.5 py-0.5 text-[10px] font-bold text-(--accent)">
               {activeWorkspace.sector}
             </span>
             <span>•</span>
-            <span>Budget: <strong className="text-[var(--text)]">{activeWorkspace.budget}</strong></span>
+            <span>Budget: <strong className="text-(--text)">{activeWorkspace.budget}</strong></span>
             <span>•</span>
-            <span>Deadline: <strong className="text-[var(--text)]">{activeWorkspace.deadline}</strong></span>
+            <span>Deadline: <strong className="text-(--text)">{activeWorkspace.deadline}</strong></span>
           </div>
         </div>
 
         {/* Tab Links */}
-        <div className="flex flex-wrap gap-1 bg-[var(--surface)] p-1 rounded-2xl border border-[var(--border)] shadow-sm max-w-max self-start lg:self-center">
+        <div className="flex flex-wrap gap-1 bg-(--surface) p-1 rounded-2xl border border-(--border) shadow-sm max-w-max self-start lg:self-center">
           {tabs.map((tab) => {
             const isActive = currentTab === tab.path || (tab.path === 'overview' && currentTab === workspaceId)
             return (
@@ -64,8 +64,8 @@ export default function WorkspaceLayout() {
                 key={tab.path}
                 className={`rounded-xl px-4 py-2 text-xs font-bold tracking-tight transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
-                    : 'text-[var(--muted)] hover:text-[var(--text)]'
+                    ? 'bg-(--accent) text-white shadow-sm'
+                    : 'text-(--muted) hover:text-(--text)'
                 }`}
                 to={tab.path === 'overview' ? `overview` : `${tab.path}`}
               >
@@ -77,7 +77,7 @@ export default function WorkspaceLayout() {
       </div>
 
       {/* Child Pages Outlet Container */}
-      <div className="rounded-3xl border border-[var(--border)] bg-[var(--surface)] p-6 md:p-8 shadow-sm transition-all duration-200">
+      <div className="rounded-3xl border border-(--border) bg-(--surface) p-6 md:p-8 shadow-sm transition-all duration-200">
         <Outlet />
       </div>
     </div>

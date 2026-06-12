@@ -100,7 +100,7 @@ export default function Portfolio() {
                       >
                         {/* Urgent Alert Banner */}
                         {isUrgent && ws.status !== "Submitted" && (
-                          <span className="absolute -top-1.5 right-4 rounded-full bg-amber-500 px-2 py-0.5 text-[8px] font-bold text-white tracking-wide uppercase">
+                          <span className="absolute top-1.5 right-1.5 rounded-full bg-amber-500 px-2 py-0.5 text-[8px] font-bold text-white tracking-wide uppercase">
                             Soon
                           </span>
                         )}

@@ -32,11 +32,9 @@ export default function Sidebar() {
       <div className="flex flex-col gap-5 min-h-0">
         {/* Brand */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="h-8 w-8 rounded-xl bg-(--accent) flex items-center justify-center text-white font-serif font-semibold text-lg shadow-sm">
-            C
-          </div>
+           <img src="/logo.svg" alt="logo" className='size-13 '/>
           <div>
-            <h1 className="font-serif font-bold text-lg leading-none text-(--text) tracking-tight">Arise</h1>
+            <h1 className="font-serif font-bold text-lg leading-none text-(--text) tracking-tight">RFPilot</h1>
             <span className="text-[9px] uppercase font-bold tracking-wider text-(--muted)">Proposal Engine</span>
           </div>
         </div>
