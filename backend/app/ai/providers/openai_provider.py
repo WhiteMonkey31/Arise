@@ -121,3 +121,90 @@ class OpenAIProvider(AIProvider):
             ],
         )
         return response.choices[0].message.content or ""
+
+    async def draft_full_document(
+        self,
+        sections: List[Dict[str, Any]],
+        org_context: Dict[str, Any],
+        target_words_per_section: int = 400,
+    ) -> Dict[str, Any]:
+        org_name = org_context.get("org_name", "Our Organization")
+        sector = org_context.get("sector", "")
+        deadline = org_context.get("deadline", "TBD")
+
+        # Cover page
+        cover_resp = await self._client.chat.completions.create(
+            model=self.model,
+            max_tokens=600,
+            messages=[
+                {"role": "system", "content": "You are a professional proposal writer."},
+                {"role": "user", "content": (
+                    f"Write a formal proposal cover page narrative (2-3 paragraphs) for:\n"
+                    f"Organization: {org_name}\nSector: {sector}\nDeadline: {deadline}\n"
+                    "Cover intent to respond, commitment to quality, and key differentiators."
+                )},
+            ],
+        )
+        cover_page = cover_resp.choices[0].message.content or ""
+
+        # Executive summary
+        section_titles = [s.get("section_title", "") for s in sections[:10]]
+        exec_resp = await self._client.chat.completions.create(
+            model=self.model,
+            max_tokens=800,
+            messages=[
+                {"role": "system", "content": "You are a professional proposal writer."},
+                {"role": "user", "content": (
+                    f"Write an executive summary (3-4 paragraphs) for a proposal from {org_name} "
+                    f"for a {sector} procurement. Key areas:\n"
+                    + "\n".join(f"- {t}" for t in section_titles)
+                )},
+            ],
+        )
+        executive_summary = exec_resp.choices[0].message.content or ""
+
+        drafted_sections = []
+        total_words = len(cover_page.split()) + len(executive_summary.split())
+
+        for section in sections:
+            req_text = section.get("requirement_text", "")
+            section_title = section.get("section_title", "Response")
+            section_number = section.get("section_number", "")
+            capabilities = section.get("capabilities", [])
+
+            cap_text = "\n".join(
+                f"- [{c.get('score', 0):.2f}] {c.get('title', '')}: {c.get('description', '')[:250]}"
+                for c in capabilities[:3]
+            ) or "Respond from general organizational capabilities."
+
+            sec_resp = await self._client.chat.completions.create(
+                model=self.model,
+                max_tokens=1200,
+                messages=[
+                    {"role": "system", "content": "Expert proposal writer. Direct, evidence-based, professional responses."},
+                    {"role": "user", "content": (
+                        f"Proposal section {section_number}: {section_title}\n\n"
+                        f"Requirement:\n{req_text}\n\n"
+                        f"Evidence:\n{cap_text}\n\n"
+                        f"~{target_words_per_section} words. Direct answer → evidence → approach → commitment."
+                    )},
+                ],
+            )
+            content = sec_resp.choices[0].message.content or ""
+            word_count = len(content.split())
+            total_words += word_count
+
+            drafted_sections.append({
+                "section_number": section_number,
+                "section_title": section_title,
+                "requirement_id": section.get("requirement_id"),
+                "content": content,
+                "word_count": word_count,
+            })
+
+        return {
+            "cover_page": cover_page,
+            "executive_summary": executive_summary,
+            "sections": drafted_sections,
+            "total_word_count": total_words,
+        }

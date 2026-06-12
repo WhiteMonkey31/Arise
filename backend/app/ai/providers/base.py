@@ -3,7 +3,6 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 
 class AIProvider(ABC):
-    # Subclasses set this so the registry knows the name
     provider_name: str = "base"
 
     @abstractmethod
@@ -30,3 +29,34 @@ class AIProvider(ABC):
         sector: str = "",
         budget: Optional[float] = None,
     ) -> str: ...
+
+    @abstractmethod
+    async def draft_full_document(
+        self,
+        sections: List[Dict[str, Any]],
+        org_context: Dict[str, Any],
+        target_words_per_section: int = 400,
+    ) -> Dict[str, Any]:
+        """
+        Auto-draft a complete structured proposal document.
+
+        Each item in `sections` contains:
+          - section_number: str  (e.g. "3.1", "Q4")
+          - section_title: str
+          - requirement_text: str
+          - capabilities: list of matched capability dicts
+          - is_mandatory: bool
+
+        `org_context` contains:
+          - org_name: str
+          - sector: str
+          - deadline: str
+          - budget: str
+
+        Returns a dict:
+          - cover_page: str
+          - executive_summary: str
+          - sections: list of {section_number, section_title, content, word_count}
+          - total_word_count: int
+        """
+        ...

@@ -26,6 +26,7 @@ celery_app.conf.update(
         "tasks.extract.extract_rfp_text": {"queue": "extract"},
         "tasks.match.match_capabilities": {"queue": "match"},
         "tasks.draft.draft_proposals": {"queue": "draft"},
+        "tasks.draft.draft_full_document": {"queue": "draft"},
     },
     task_default_queue="celery",
 )

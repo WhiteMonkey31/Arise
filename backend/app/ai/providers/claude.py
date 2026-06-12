@@ -137,3 +137,95 @@ class ClaudeProvider(AIProvider):
             messages=[{"role": "user", "content": prompt}],
         )
         return message.content[0].text.strip()
+
+    async def draft_full_document(
+        self,
+        sections: List[Dict[str, Any]],
+        org_context: Dict[str, Any],
+        target_words_per_section: int = 400,
+    ) -> Dict[str, Any]:
+        org_name = org_context.get("org_name", "Our Organization")
+        sector = org_context.get("sector", "")
+        deadline = org_context.get("deadline", "TBD")
+        budget = org_context.get("budget", "As per RFP")
+
+        # Cover page
+        cover_message = await self._client.messages.create(
+            model=self.model,
+            max_tokens=600,
+            system="You are a professional proposal writer. Write a formal proposal cover page narrative.",
+            messages=[{"role": "user", "content": (
+                f"Write a concise proposal cover page narrative (2-3 paragraphs) for:\n"
+                f"Organization: {org_name}\nSector: {sector}\nDeadline: {deadline}\nBudget: {budget}\n\n"
+                "Cover the organization's intent to respond, commitment to quality, and key differentiators. "
+                "Do not include any headers or titles."
+            )}],
+        )
+        cover_page = cover_message.content[0].text.strip()
+
+        # Executive summary — built from all section titles
+        section_titles = [s.get("section_title", "") for s in sections[:10]]
+        exec_message = await self._client.messages.create(
+            model=self.model,
+            max_tokens=800,
+            system="You are a professional proposal writer. Write a compelling executive summary.",
+            messages=[{"role": "user", "content": (
+                f"Write an executive summary (3-4 paragraphs) for a proposal from {org_name} "
+                f"for a {sector} procurement. The proposal addresses these key areas:\n"
+                + "\n".join(f"- {t}" for t in section_titles)
+                + f"\n\nOrganization: {org_name}\nDeadline: {deadline}\n"
+                "Highlight key strengths, approach, and value proposition."
+            )}],
+        )
+        executive_summary = exec_message.content[0].text.strip()
+
+        # Draft each section
+        drafted_sections = []
+        total_words = len(cover_page.split()) + len(executive_summary.split())
+
+        for section in sections:
+            req_text = section.get("requirement_text", "")
+            section_title = section.get("section_title", "Response")
+            section_number = section.get("section_number", "")
+            capabilities = section.get("capabilities", [])
+
+            cap_text = "\n".join(
+                f"- [{c.get('score', 0):.2f}] {c.get('title', '')}: {c.get('description', '')[:250]}"
+                for c in capabilities[:3]
+            ) or "No specific evidence available — respond from general organizational capabilities."
+
+            section_message = await self._client.messages.create(
+                model=self.model,
+                max_tokens=1200,
+                system=(
+                    "You are an expert proposal writer. Write a structured, evidence-based response "
+                    "that directly and completely addresses the requirement. "
+                    "Use professional tone, cite specific capabilities, and be concise but thorough."
+                ),
+                messages=[{"role": "user", "content": (
+                    f"Write a proposal response for section {section_number}: {section_title}\n\n"
+                    f"**Requirement:**\n{req_text}\n\n"
+                    f"**Available Evidence:**\n{cap_text}\n\n"
+                    f"Target ~{target_words_per_section} words. "
+                    "Structure: direct answer → supporting evidence → methodology/approach → commitment. "
+                    "Do not include the section heading."
+                )}],
+            )
+            content = section_message.content[0].text.strip()
+            word_count = len(content.split())
+            total_words += word_count
+
+            drafted_sections.append({
+                "section_number": section_number,
+                "section_title": section_title,
+                "requirement_id": section.get("requirement_id"),
+                "content": content,
+                "word_count": word_count,
+            })
+
+        return {
+            "cover_page": cover_page,
+            "executive_summary": executive_summary,
+            "sections": drafted_sections,
+            "total_word_count": total_words,
+        }
