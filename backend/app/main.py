@@ -18,6 +18,8 @@ from app.api.proposals import router as proposals_router
 from app.api.upload import router as upload_router
 from app.api.win_score import router as win_score_router
 from app.api.workspaces import router as workspaces_router
+from app.api.ai_providers import router as ai_providers_router
+from app.api.iso_compliance import router as iso_router
 from app.auth.users import router as auth_router
 
 logger = get_logger("main")
@@ -58,7 +60,7 @@ def create_app() -> FastAPI:
     routers = [
         auth_router, workspaces_router, upload_router, compliance_router,
         proposals_router, export_router, capabilities_router, jobs_router,
-        win_score_router, analytics_router,
+        win_score_router, analytics_router, ai_providers_router, iso_router,
     ]
     for router in routers:
         app.include_router(router)

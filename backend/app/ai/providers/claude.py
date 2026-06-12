@@ -41,9 +41,11 @@ Return EXACTLY 3 sentences:
 
 
 class ClaudeProvider(AIProvider):
-    def __init__(self) -> None:
-        self._client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
-        self.model = settings.CLAUDE_MODEL
+    provider_name = "claude"
+
+    def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None) -> None:
+        self._client = anthropic.AsyncAnthropic(api_key=api_key or settings.ANTHROPIC_API_KEY)
+        self.model = model_name or settings.CLAUDE_MODEL
 
     async def extract_requirements(self, text: str) -> Dict[str, Any]:
         truncated = text[:150_000]

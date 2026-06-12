@@ -24,19 +24,11 @@ from app.tasks.celery_app import celery_app
 logger = get_logger("upload_api")
 router = APIRouter(prefix="/api/workspaces", tags=["upload"])
 
-ALLOWED_MIME_TYPES = {
-    "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/msword",
-}
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc"}
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+MAX_FILE_SIZE = settings.max_file_size_bytes  # from config, defaults to 30 MB
 
 
-# ---------------------------------------------------------------------------
 # Schemas
-# ---------------------------------------------------------------------------
-
 class UploadResponse(BaseModel):
     document_id: UUID
     job_id: UUID
@@ -47,6 +39,9 @@ class UploadResponse(BaseModel):
 class DocumentResponse(BaseModel):
     id: UUID
     filename: str
+    original_filename: str
+    file_size: Optional[int]
+    mime_type: Optional[str]
     s3_key: str
     status: DocumentStatus
     created_at: datetime
@@ -54,10 +49,7 @@ class DocumentResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ---------------------------------------------------------------------------
 # Endpoints
-# ---------------------------------------------------------------------------
-
 @router.post("/{workspace_id}/upload", response_model=UploadResponse, status_code=status.HTTP_202_ACCEPTED)
 async def upload_document(
     workspace_id: UUID,
@@ -82,7 +74,7 @@ async def upload_document(
     # Read file content with size check
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="File exceeds 50MB limit")
+        raise HTTPException(status_code=400, detail=f"File exceeds {settings.MAX_FILE_SIZE_MB}MB limit")
 
     # Store file (local or S3)
     safe_filename = f"{uuid4().hex}{ext}"
@@ -118,6 +110,9 @@ async def upload_document(
     doc = RfpDocument(
         workspace_id=workspace_id,
         filename=file.filename or safe_filename,
+        original_filename=file.filename or safe_filename,
+        file_size=len(content),
+        mime_type=file.content_type,
         s3_key=s3_key,
         status=DocumentStatus.PENDING,
     )
@@ -179,10 +174,7 @@ async def list_documents(
     return [DocumentResponse.model_validate(d) for d in docs]
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
-
 async def _check_workspace(
     workspace_id: UUID,
     user: User,

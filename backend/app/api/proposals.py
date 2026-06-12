@@ -31,10 +31,7 @@ logger = get_logger("proposals_api")
 router = APIRouter(prefix="/api/workspaces", tags=["proposals"])
 
 
-# ---------------------------------------------------------------------------
 # Schemas
-# ---------------------------------------------------------------------------
-
 class ProposalResponse(BaseModel):
     id: UUID
     workspace_id: UUID
@@ -66,10 +63,7 @@ class GenerateProposalsResponse(BaseModel):
     message: str
 
 
-# ---------------------------------------------------------------------------
 # Endpoints
-# ---------------------------------------------------------------------------
-
 @router.get("/{workspace_id}/proposals", response_model=List[ProposalResponse])
 async def list_proposals(
     workspace_id: UUID,
@@ -251,10 +245,7 @@ async def update_proposal_status(
     return ProposalResponse.model_validate(proposal)
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
-
 async def _check_workspace(workspace_id: UUID, user: User, session: AsyncSession) -> Workspace:
     workspace = await session.get(Workspace, workspace_id)
     if not workspace or workspace.deleted_at is not None:

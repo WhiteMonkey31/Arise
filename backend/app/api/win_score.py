@@ -18,10 +18,7 @@ logger = get_logger("win_score_api")
 router = APIRouter(prefix="/api/workspaces", tags=["win-score"])
 
 
-# ---------------------------------------------------------------------------
 # Schemas
-# ---------------------------------------------------------------------------
-
 class WinScoreAxes(BaseModel):
     budget_fit: float
     compliance_pct: float
@@ -51,10 +48,7 @@ class GoNoGoResponse(BaseModel):
     sector: Optional[str]
 
 
-# ---------------------------------------------------------------------------
 # Endpoints
-# ---------------------------------------------------------------------------
-
 @router.get("/{workspace_id}/win-score", response_model=WinScoreResponse)
 async def get_win_score(
     workspace_id: UUID,
@@ -112,10 +106,7 @@ async def get_go_no_go(
     return GoNoGoResponse(**decision)
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
-
 async def _check_workspace(workspace_id: UUID, user: User, session: AsyncSession) -> Workspace:
     workspace = await session.get(Workspace, workspace_id)
     if not workspace or workspace.deleted_at is not None:

@@ -50,6 +50,14 @@ class BidOutcome(str, Enum):
     LOSS = "loss"
 
 
+class AIProviderName(str, Enum):
+    CLAUDE = "claude"
+    OPENAI = "openai"
+    GEMINI = "gemini"
+    GROK = "grok"
+    CUSTOM = "custom"
+
+
 class Organization(SQLModel, table=True):
     __tablename__ = "organizations"
 
@@ -62,6 +70,7 @@ class Organization(SQLModel, table=True):
     users: List["User"] = Relationship(back_populates="organization")
     capabilities: List["Capability"] = Relationship(back_populates="organization")
     bids: List["Bid"] = Relationship(back_populates="organization")
+    ai_providers: List["AIProviderConfig"] = Relationship(back_populates="organization")
 
 
 class User(SQLModel, table=True):
@@ -69,10 +78,14 @@ class User(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     email: str = Field(max_length=255, unique=True, index=True)
-    hashed_password: str = Field(max_length=255)
+    hashed_password: Optional[str] = Field(default=None, max_length=255)  # nullable for OAuth users
     org_id: UUID = Field(foreign_key="organizations.id", index=True)
     role: UserRole = Field(default=UserRole.REVIEWER, sa_column=Column(String(20)))
     is_active: bool = Field(default=True)
+    # Google OAuth fields
+    google_id: Optional[str] = Field(default=None, max_length=255, index=True)
+    google_picture: Optional[str] = Field(default=None, max_length=512)
+    full_name: Optional[str] = Field(default=None, max_length=255)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     organization: Optional[Organization] = Relationship(back_populates="users")
@@ -86,7 +99,9 @@ class Workspace(SQLModel, table=True):
     org_id: UUID = Field(foreign_key="organizations.id", index=True)
     sector: Optional[str] = Field(default=None, max_length=100)
     deadline: Optional[datetime] = Field(default=None)
+    budget: Optional[float] = Field(default=None)
     status: WorkspaceStatus = Field(default=WorkspaceStatus.DRAFT, sa_column=Column(String(20)))
+    win_probability: Optional[float] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = Field(default=None)
@@ -105,6 +120,9 @@ class RfpDocument(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     workspace_id: UUID = Field(foreign_key="workspaces.id", index=True)
     filename: str = Field(max_length=255)
+    original_filename: str = Field(max_length=255)
+    file_size: Optional[int] = Field(default=None)  # bytes
+    mime_type: Optional[str] = Field(default=None, max_length=100)
     s3_key: str = Field(max_length=512)
     extracted_text: Optional[str] = Field(default=None, sa_column=Column(sa.Text))
     status: DocumentStatus = Field(default=DocumentStatus.PENDING, sa_column=Column(String(20)))
@@ -127,6 +145,9 @@ class Requirement(SQLModel, table=True):
     evaluation_criteria: Optional[str] = Field(default=None, sa_column=Column(sa.Text))
     deadline_ref: Optional[str] = Field(default=None, max_length=255)
     budget_ref: Optional[str] = Field(default=None, max_length=255)
+    # ISO/compliance standard references
+    iso_standard: Optional[str] = Field(default=None, max_length=100)  # e.g. "ISO 9001", "ISO 27001"
+    compliance_ref: Optional[str] = Field(default=None, max_length=255)  # external standard ID
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     rfp_document: Optional[RfpDocument] = Relationship(back_populates="requirements")
@@ -182,6 +203,10 @@ class ComplianceItem(SQLModel, table=True):
     match_score: Optional[float] = Field(default=None)
     status: ComplianceStatus = Field(default=ComplianceStatus.GAP, sa_column=Column(String(10)))
     notes: Optional[str] = Field(default=None, sa_column=Column(sa.Text))
+    # ISO verification fields
+    iso_verified: bool = Field(default=False)
+    iso_standard: Optional[str] = Field(default=None, max_length=100)
+    iso_clause: Optional[str] = Field(default=None, max_length=100)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     workspace: Optional[Workspace] = Relationship(back_populates="compliance_items")
@@ -202,6 +227,7 @@ class Proposal(SQLModel, table=True):
     status: ProposalStatus = Field(default=ProposalStatus.PENDING, sa_column=Column(String(20)))
     quality_score: Optional[float] = Field(default=None)
     quality_badge: Optional[str] = Field(default=None, max_length=20)
+    ai_provider_used: Optional[str] = Field(default=None, max_length=50)  # which AI drafted this
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -236,3 +262,22 @@ class Job(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     workspace: Optional[Workspace] = Relationship(back_populates="jobs")
+
+
+# Stores per-org AI provider configs (including custom ones)
+class AIProviderConfig(SQLModel, table=True):
+    __tablename__ = "ai_provider_configs"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    org_id: UUID = Field(foreign_key="organizations.id", index=True)
+    name: str = Field(max_length=100)  # display name, e.g. "My Azure OpenAI"
+    provider_type: str = Field(max_length=50, sa_column=Column(String(50)))  # claude/openai/gemini/grok/custom
+    api_key_encrypted: str = Field(sa_column=Column(sa.Text))  # encrypted at rest
+    base_url: Optional[str] = Field(default=None, max_length=512)  # for custom/Azure endpoints
+    model_name: str = Field(max_length=100)  # e.g. "gpt-4o", "gemini-1.5-pro"
+    is_active: bool = Field(default=True)
+    is_default: bool = Field(default=False)  # org's default provider
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    organization: Optional[Organization] = Relationship(back_populates="ai_providers")

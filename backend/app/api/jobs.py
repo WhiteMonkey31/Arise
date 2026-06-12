@@ -18,10 +18,7 @@ logger = get_logger("jobs_api")
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
-# ---------------------------------------------------------------------------
 # Schemas
-# ---------------------------------------------------------------------------
-
 class JobResponse(BaseModel):
     id: UUID
     workspace_id: Optional[UUID]
@@ -36,10 +33,7 @@ class JobResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ---------------------------------------------------------------------------
 # Endpoints
-# ---------------------------------------------------------------------------
-
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job_status(
     job_id: UUID,
