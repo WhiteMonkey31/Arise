@@ -20,19 +20,22 @@ export default function Modal({ isOpen, onClose, title, children, footerActions 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
+      <div>
+        
+      </div>
       <div 
-        className="absolute inset-0 bg-stone-900/40 dark:bg-stone-950/60 backdrop-blur-sm transition-opacity" 
+        className="absolute inset-0 rounded bg-stone-900/30 dark:bg-stone-950/60 backdrop-blur-xs transition-opacity" 
         onClick={onClose}
       />
       
       {/* Modal Container */}
-      <div className="relative w-full max-w-md rounded-3xl border border-(--border] bg-(--surface] p-6 shadow-xl z-10 fade-in transition-all duration-200">
+      <div className="relative w-full max-w-md rounded-3xl border border-(--border) bg-(--surface) p-6 shadow-xl z-10 fade-in transition-all duration-200">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-serif font-bold text-lg text-(--text]">{title}</h3>
+          <h3 className="font-serif font-bold text-lg text-(--text)">{title}</h3>
           <button 
             onClick={onClose}
-            className="rounded-xl p-1.5 text-(--muted] hover:text-(--text] hover:bg-(--accent-bg] transition cursor-pointer"
+            className="rounded-xl p-1.5 text-(--muted) hover:text-(--text) hover:bg-(--accent-bg) transition cursor-pointer"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -41,11 +44,11 @@ export default function Modal({ isOpen, onClose, title, children, footerActions 
         </div>
 
         {/* Body Content */}
-        <div className="text-sm text-(--text]">{children}</div>
+        <div className="text-sm text-(--text)">{children}</div>
 
         {/* Footer Actions */}
         {footerActions && (
-          <div className="flex items-center justify-end gap-2.5 mt-5 border-t border-(--border] pt-4">
+          <div className="flex items-center justify-end gap-2.5 mt-5 border-t border-(--border) pt-4">
             {footerActions}
           </div>
         )}
