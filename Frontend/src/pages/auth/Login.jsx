@@ -23,11 +23,9 @@ export default function Login() {
 
   return (
     <div className="space-y-6 fade-in select-none">
-      <div className="text-center space-y-1.5">
-        <div className="h-10 w-10 rounded-2xl bg-(--accent) text-white font-serif font-semibold text-xl flex items-center justify-center mx-auto shadow-sm mb-3">
-          C
-        </div>
-        <h2 className="font-serif font-bold text-xl text-(--text) tracking-tight">Sign in to Arise</h2>
+      <div className="text-center space-y-1.5 flex flex-col items-center justify-center">
+        <img src="/logo.svg" alt="logo" className='size-15 '/>
+        <h2 className="font-serif font-bold text-xl text-(--text) tracking-tight">Sign in to RFPilot</h2>
         <p className="text-[10px] text-(--muted) font-bold uppercase tracking-wider font-sans">Bid & Proposal Response Engine</p>
       </div>
 

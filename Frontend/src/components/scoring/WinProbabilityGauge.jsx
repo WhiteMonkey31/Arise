@@ -12,7 +12,7 @@ export default function WinProbabilityGauge({ score = 0 }) {
   const strokeDashoffset = circumference - (score / 100) * circumference
 
   return (
-    <div className="relative inline-flex items-center justify-center flex-shrink-0">
+    <div className="relative inline-flex items-center justify-center shrink-0">
       <svg className="w-11 h-11 transform -rotate-90">
         {/* Background track */}
         <circle
@@ -36,7 +36,7 @@ export default function WinProbabilityGauge({ score = 0 }) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="absolute text-[10px] font-bold text-[var(--text)]">
+      <span className="absolute text-[10px] font-bold text-(--text)">
         {score}%
       </span>
     </div>
