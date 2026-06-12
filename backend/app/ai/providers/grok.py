@@ -4,38 +4,39 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from openai import AsyncOpenAI
 
 from app.ai.providers.base import AIProvider
-from app.config import settings
 from app.logger import get_logger
 
-logger = get_logger("openai_provider")
+logger = get_logger("grok_provider")
+
+# Grok uses an OpenAI-compatible API endpoint
+GROK_BASE_URL = "https://api.x.ai/v1"
 
 
-class OpenAIProvider(AIProvider):
-    provider_name = "openai"
+class GrokProvider(AIProvider):
+    """xAI Grok provider — uses the OpenAI-compatible SDK with x.ai base URL."""
 
-    def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None, base_url: Optional[str] = None) -> None:
-        self._client = AsyncOpenAI(
-            api_key=api_key or settings.OPENAI_API_KEY,
-            base_url=base_url or None,
-        )
-        self.model = model_name or settings.OPENAI_MODEL
+    provider_name = "grok"
+
+    def __init__(self, api_key: str, model_name: str = "grok-2-latest") -> None:
+        self._client = AsyncOpenAI(api_key=api_key, base_url=GROK_BASE_URL)
+        self.model = model_name
+        logger.info("GrokProvider initialized", model=model_name)
 
     async def extract_requirements(self, text: str) -> Dict[str, Any]:
-        truncated = text[:120_000]
+        truncated = text[:100_000]
         response = await self._client.chat.completions.create(
             model=self.model,
             max_tokens=4096,
-            response_format={"type": "json_object"},
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "You are an expert RFP analyst. Extract structured information and return valid JSON with keys: "
+                        "You are an expert RFP analyst. Extract structured info and return ONLY valid JSON with keys: "
                         "mandatory_requirements (list), evaluation_criteria (list), deadlines (list), "
                         "budget (string or null), qa_sections (list)."
                     ),
                 },
-                {"role": "user", "content": f"Extract requirements from this RFP:\n\n{truncated}"},
+                {"role": "user", "content": f"Extract requirements:\n\n{truncated}"},
             ],
         )
         raw = response.choices[0].message.content or "{}"
@@ -60,7 +61,7 @@ class OpenAIProvider(AIProvider):
             max_tokens=1500,
             stream=True,
             messages=[
-                {"role": "system", "content": "You are an expert proposal writer for government and enterprise RFPs."},
+                {"role": "system", "content": "You are an expert proposal writer for RFPs."},
                 {
                     "role": "user",
                     "content": (
@@ -82,15 +83,12 @@ class OpenAIProvider(AIProvider):
         response = await self._client.chat.completions.create(
             model=self.model,
             max_tokens=512,
-            response_format={"type": "json_object"},
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "Score the proposal draft on: compliance_coverage (0-1), clarity (0-1), "
-                        "evidence_strength (0-1), word_count_fit (0-1). Compute overall average. "
-                        "badge: Excellent (>=0.80), Good (0.60-0.79), Needs Work (<0.60). "
-                        "Return JSON with all keys plus 'feedback' (one sentence)."
+                        "Score the draft on: compliance_coverage, clarity, evidence_strength, word_count_fit (all 0-1). "
+                        "Return JSON with these keys + overall (average) + badge (Excellent/Good/Needs Work) + feedback."
                     ),
                 },
                 {"role": "user", "content": f"Requirement:\n{requirement}\n\nDraft:\n{draft[:3000]}"},
@@ -110,13 +108,13 @@ class OpenAIProvider(AIProvider):
         sector: str = "",
         budget: Optional[float] = None,
     ) -> str:
-        gaps_text = "\n".join(f"- {g}" for g in gaps[:10]) or "None identified"
+        gaps_text = "\n".join(f"- {g}" for g in gaps[:10]) if gaps else "None"
         win_rate = sum(1 for b in history if b.get("outcome") == "win") / max(len(history), 1) * 100
         response = await self._client.chat.completions.create(
             model=self.model,
             max_tokens=300,
             messages=[
-                {"role": "system", "content": "Strategic bid advisor. Exactly 3 sentences: 1) GO/NO-GO + confidence, 2) top 2 risks, 3) key factor."},
+                {"role": "system", "content": "Strategic bid advisor. Give exactly 3 sentences: 1) GO/NO-GO + confidence, 2) top 2 risks, 3) key factor."},
                 {"role": "user", "content": f"Win Score: {win_score:.1f}/100\nSector: {sector}\nHistorical win rate: {win_rate:.0f}%\nGaps:\n{gaps_text}"},
             ],
         )

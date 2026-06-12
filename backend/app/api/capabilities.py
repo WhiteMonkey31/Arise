@@ -22,10 +22,7 @@ logger = get_logger("capabilities_api")
 router = APIRouter(prefix="/api/capabilities", tags=["capabilities"])
 
 
-# ---------------------------------------------------------------------------
 # Schemas
-# ---------------------------------------------------------------------------
-
 class CapabilityCreate(BaseModel):
     title: str
     description: str
@@ -66,10 +63,7 @@ class ImportResponse(BaseModel):
     errors: List[str]
 
 
-# ---------------------------------------------------------------------------
 # Endpoints
-# ---------------------------------------------------------------------------
-
 @router.get("", response_model=List[CapabilityResponse])
 async def list_capabilities(
     domain: Optional[str] = Query(default=None),
@@ -286,10 +280,7 @@ async def import_capabilities(
     return ImportResponse(created=created, failed=failed, errors=errors)
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
-
 async def _get_owned_capability(
     capability_id: UUID,
     user: User,

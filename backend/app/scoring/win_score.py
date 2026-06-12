@@ -115,10 +115,7 @@ class WinScoreEngine:
             "gap_count": sum(1 for i in all_items if i.status == ComplianceStatus.GAP),
         }
 
-    # -----------------------------------------------------------------------
     # Axis scorers (each returns 0-100)
-    # -----------------------------------------------------------------------
-
     def _score_compliance(self, items: List[ComplianceItem]) -> float:
         """Score based on current compliance percentage."""
         if not items:

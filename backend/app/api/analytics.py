@@ -18,10 +18,7 @@ logger = get_logger("analytics_api")
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
-# ---------------------------------------------------------------------------
 # Schemas
-# ---------------------------------------------------------------------------
-
 class BidHistoryRow(BaseModel):
     id: str
     sector: Optional[str]
@@ -53,10 +50,7 @@ class ComplianceVsWinRate(BaseModel):
     win_rate: float
 
 
-# ---------------------------------------------------------------------------
 # Endpoints
-# ---------------------------------------------------------------------------
-
 @router.get("/bid-history", response_model=List[BidHistoryRow])
 async def get_bid_history(
     sector: Optional[str] = Query(default=None),

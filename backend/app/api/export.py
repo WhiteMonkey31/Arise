@@ -31,10 +31,7 @@ logger = get_logger("export_api")
 router = APIRouter(prefix="/api/workspaces", tags=["export"])
 
 
-# ---------------------------------------------------------------------------
 # Endpoint
-# ---------------------------------------------------------------------------
-
 @router.post("/{workspace_id}/export")
 async def export_proposal(
     workspace_id: UUID,
@@ -80,10 +77,7 @@ async def export_proposal(
     )
 
 
-# ---------------------------------------------------------------------------
 # DOCX Builder
-# ---------------------------------------------------------------------------
-
 async def _build_docx(
     workspace: Workspace,
     proposals: list,
@@ -245,10 +239,7 @@ async def _add_appendix(
                 doc.add_paragraph()
 
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
-
 async def _check_workspace(workspace_id: UUID, user: User, session: AsyncSession) -> Workspace:
     workspace = await session.get(Workspace, workspace_id)
     if not workspace or workspace.deleted_at is not None:
