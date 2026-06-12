@@ -20,13 +20,19 @@ sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
 alembic==1.14.0
 
+
+firebase-admin
+pandas
+openpyxl
+
+
 # ---- Authentication ----
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.2.1
 
 # ---- AI — Anthropic (Claude) ----
-anthropic==0.40.0
+anthropic==0.41.0
 
 # ---- AI — OpenAI (GPT-4o + Embeddings) ----
 openai==1.57.2
