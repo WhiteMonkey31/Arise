@@ -1,37 +1,66 @@
 import React, { useState } from 'react'
-import { useWorkspaceStore } from '../store/workspaceStore'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { listCapabilities, createCapability, updateCapability, deleteCapability } from '../services/capabilityService'
+import { useDebounce } from '../hooks/useDebounce'
 import CapabilityTable from '../components/capability/CapabilityTable'
 import CapabilityDrawer from '../components/capability/CapabilityDrawer'
+import LoadingSpinner from '../components/ui/LoadingSpinner'
+import { toastSuccess, toastError } from '../components/ui/ToastProvider'
+
+const CAPS_KEY = ['capabilities']
 
 export default function CapabilityLibrary() {
-  const { capabilities } = useWorkspaceStore()
+  const qc = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
   const [certFilter, setCertFilter] = useState('All')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedCap, setSelectedCap] = useState(null)
 
-  const handleEdit = (cap) => {
-    setSelectedCap(cap)
-    setDrawerOpen(true)
-  }
+  const debouncedSearch = useDebounce(searchQuery, 350)
 
-  const handleCreate = () => {
-    setSelectedCap(null)
-    setDrawerOpen(true)
-  }
-
-  const filteredCapabilities = capabilities.filter((cap) => {
-    const matchesSearch = 
-      cap.domain.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cap.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (cap.clientType && cap.clientType.toLowerCase().includes(searchQuery.toLowerCase()))
-      
-    const matchesCert = 
-      certFilter === 'All' || 
-      cap.certification === certFilter
-
-    return matchesSearch && matchesCert
+  const { data: capabilities = [], isLoading } = useQuery({
+    queryKey: [...CAPS_KEY, debouncedSearch, certFilter],
+    queryFn: () =>
+      listCapabilities({
+        search: debouncedSearch || undefined,
+        certification: certFilter !== 'All' ? certFilter : undefined,
+        limit: 200,
+      }),
+    staleTime: 30_000,
   })
+
+  const createMutation = useMutation({
+    mutationFn: createCapability,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: CAPS_KEY }); toastSuccess('Capability added') },
+    onError: (err) => toastError(err.response?.data?.detail || 'Failed to add capability'),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }) => updateCapability(id, payload),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: CAPS_KEY }); toastSuccess('Capability updated') },
+    onError: (err) => toastError(err.response?.data?.detail || 'Failed to update capability'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteCapability,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: CAPS_KEY }); toastSuccess('Capability deleted') },
+    onError: (err) => toastError(err.response?.data?.detail || 'Failed to delete capability'),
+  })
+
+  const handleEdit = (cap) => { setSelectedCap(cap); setDrawerOpen(true) }
+  const handleCreate = () => { setSelectedCap(null); setDrawerOpen(true) }
+
+  const handleSave = (capData) => {
+    if (selectedCap) {
+      updateMutation.mutate({ id: selectedCap.id, payload: capData })
+    } else {
+      createMutation.mutate(capData)
+    }
+    setDrawerOpen(false)
+    setSelectedCap(null)
+  }
+
+  const handleDelete = (id) => { deleteMutation.mutate(id) }
 
   const certs = ['All', 'None', 'FedRAMP High', 'ISO 27001', 'SOC 2 Type II']
 
@@ -56,13 +85,12 @@ export default function CapabilityLibrary() {
 
       {/* Filters bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-(--surface) p-4 rounded-3xl border border-(--border) shadow-sm">
-        {/* Search */}
         <div className="flex flex-col gap-1 sm:col-span-2">
           <label className="text-[9px] uppercase font-bold tracking-wider text-(--muted)">Search Records</label>
           <div className="relative">
             <input
               type="text"
-              placeholder="Search by domain, summary details, client type..."
+              placeholder="Search by domain, summary, client type..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-xl border border-(--border) bg-(--surface) pl-9 pr-3 py-2.5 text-xs text-(--text) focus:border-(--accent) focus:outline-hidden transition"
@@ -74,8 +102,6 @@ export default function CapabilityLibrary() {
             </div>
           </div>
         </div>
-
-        {/* Cert Filter */}
         <div className="flex flex-col gap-1">
           <label className="text-[9px] uppercase font-bold tracking-wider text-(--muted)">Certification</label>
           <select
@@ -83,24 +109,27 @@ export default function CapabilityLibrary() {
             onChange={(e) => setCertFilter(e.target.value)}
             className="rounded-xl border border-(--border) bg-(--surface) px-3 py-2.5 text-xs text-(--text) focus:border-(--accent) focus:outline-hidden transition cursor-pointer"
           >
-            {certs.map(c => <option key={c} value={c}>{c}</option>)}
+            {certs.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Table grid */}
-      <CapabilityTable 
-        capabilities={filteredCapabilities} 
-        onEdit={handleEdit} 
-      />
+      {/* Table */}
+      {isLoading ? (
+        <div className="flex justify-center py-10"><LoadingSpinner /></div>
+      ) : (
+        <CapabilityTable
+          capabilities={capabilities}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      )}
 
       <CapabilityDrawer
         isOpen={drawerOpen}
-        onClose={() => {
-          setDrawerOpen(false)
-          setSelectedCap(null)
-        }}
+        onClose={() => { setDrawerOpen(false); setSelectedCap(null) }}
         capabilityToEdit={selectedCap}
+        onSave={handleSave}
       />
     </div>
   )

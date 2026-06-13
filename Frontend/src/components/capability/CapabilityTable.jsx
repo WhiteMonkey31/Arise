@@ -1,21 +1,25 @@
 import React, { useState } from 'react'
 import ConfirmDialog from '../ui/ConfirmDialog'
-import { useWorkspaceStore } from '../../store/workspaceStore'
 import { toastSuccess } from '../ui/ToastProvider'
 
-export default function CapabilityTable({ capabilities, onEdit }) {
-  const { deleteCapability } = useWorkspaceStore()
+/**
+ * CapabilityTable — receives capabilities from React Query (via CapabilityLibrary page).
+ * Delete is handled by the `onDelete` callback so the page can call the real API mutation.
+ */
+export default function CapabilityTable({ capabilities, onEdit, onDelete }) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [targetCapId, setTargetCapId] = useState(null)
 
   const formatCurrency = (val) => {
     if (!val) return '—'
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val)
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+    }).format(val)
   }
 
   const handleDelete = () => {
     if (targetCapId) {
-      deleteCapability(targetCapId)
+      onDelete?.(targetCapId)
       toastSuccess('Capability record deleted')
       setTargetCapId(null)
     }
@@ -26,46 +30,44 @@ export default function CapabilityTable({ capabilities, onEdit }) {
       <table className="w-full text-xs text-left border-collapse">
         <thead>
           <tr className="border-b border-[var(--border)] bg-[var(--accent-bg)]/20 text-[var(--muted)] font-bold uppercase tracking-wider text-[9px] sm:text-[10px]">
-            <th className="px-5 py-4">ID</th>
             <th className="px-5 py-4">Domain Area</th>
             <th className="px-5 py-4">Certification</th>
             <th className="px-5 py-4">Year</th>
             <th className="px-5 py-4">Client / Industry</th>
-            <th className="px-5 py-4">Value</th>
             <th className="px-5 py-4 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-[var(--border)] font-medium text-[var(--text)]">
           {capabilities.length === 0 ? (
             <tr>
-              <td colSpan="7" className="px-5 py-8 text-center text-[var(--muted)]">
+              <td colSpan="5" className="px-5 py-8 text-center text-[var(--muted)]">
                 No matching records found.
               </td>
             </tr>
           ) : (
             capabilities.map((cap) => (
-              <tr 
+              <tr
                 key={cap.id}
                 className="hover:bg-[var(--accent-bg)]/30 transition-colors cursor-pointer group"
                 onClick={() => onEdit(cap)}
               >
-                <td className="px-5 py-4 font-mono font-bold text-[var(--accent)]">{cap.id}</td>
                 <td className="px-5 py-4 max-w-xs sm:max-w-md">
-                  <div className="font-serif font-bold text-xs sm:text-sm leading-snug">{cap.domain}</div>
-                  <div className="text-[10px] text-[var(--muted)] line-clamp-1 mt-0.5 font-sans font-medium">{cap.summary}</div>
+                  <div className="font-serif font-bold text-xs sm:text-sm leading-snug">{cap.title || cap.domain}</div>
+                  <div className="text-[10px] text-[var(--muted)] line-clamp-1 mt-0.5 font-sans font-medium">
+                    {cap.description || cap.summary}
+                  </div>
                 </td>
                 <td className="px-5 py-4">
                   <span className={`px-2 py-0.5 rounded-lg text-[9px] font-bold border whitespace-nowrap ${
-                    cap.certification === 'None' 
+                    !cap.certification || cap.certification === 'None'
                       ? 'bg-stone-50 dark:bg-stone-900/30 text-stone-600 dark:text-stone-400 border-stone-100 dark:border-stone-800'
                       : 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border-indigo-100 dark:border-indigo-900/30'
                   }`}>
-                    {cap.certification}
+                    {cap.certification || 'None'}
                   </span>
                 </td>
-                <td className="px-5 py-4">{cap.year}</td>
-                <td className="px-5 py-4">{cap.clientType || '—'}</td>
-                <td className="px-5 py-4 font-semibold">{formatCurrency(cap.contractValue)}</td>
+                <td className="px-5 py-4">{cap.year || '—'}</td>
+                <td className="px-5 py-4">{cap.client_type || cap.clientType || '—'}</td>
                 <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex justify-end gap-1.5">
                     <button
@@ -77,10 +79,7 @@ export default function CapabilityTable({ capabilities, onEdit }) {
                       </svg>
                     </button>
                     <button
-                      onClick={() => {
-                        setTargetCapId(cap.id)
-                        setShowConfirmDelete(true)
-                      }}
+                      onClick={() => { setTargetCapId(cap.id); setShowConfirmDelete(true) }}
                       className="rounded-xl p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 border border-transparent hover:border-red-200 transition cursor-pointer"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -97,13 +96,10 @@ export default function CapabilityTable({ capabilities, onEdit }) {
 
       <ConfirmDialog
         isOpen={showConfirmDelete}
-        onClose={() => {
-          setShowConfirmDelete(false)
-          setTargetCapId(null)
-        }}
+        onClose={() => { setShowConfirmDelete(false); setTargetCapId(null) }}
         onConfirm={handleDelete}
         title="Delete Capability Record"
-        message="Are you sure you want to delete this capability record? It will be permanently removed from the past performance database."
+        message="Are you sure you want to delete this capability record? It will be permanently removed."
         confirmLabel="Delete"
         isDestructive
       />

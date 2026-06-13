@@ -1,38 +1,33 @@
-import React, {useState} from 'react'
+import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useAuthStore } from '../../store/authStore'
+import { useWorkspaces } from '../../hooks/useWorkspace'
 
 export default function Sidebar() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { workspaces, activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore()
+  const { activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore()
   const { user, logout } = useAuthStore()
 
-  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId)
+  // Pull live workspace list from React Query
+  const { data: workspaces = [] } = useWorkspaces()
 
   const links = [
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'Portfolio', path: '/portfolio' },
     { name: 'Capabilities', path: '/capabilities' },
-    { name: 'Analytics', path: '/analytics' }
+    { name: 'Analytics', path: '/analytics' },
   ]
 
-  const [theme, setTheme] = useState(() => {
-      try {
-        const t = localStorage.getItem('theme')
-        return t || 'light'
-      } catch (e) {
-        return 'light'
-      } 
-    })
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
 
   return (
     <aside className="shrink-0 w-64 border-r border-(--border) bg-(--surface) p-6 shadow-xs hidden md:flex flex-col justify-between h-screen sticky top-0 z-20 transition-all duration-200">
       <div className="flex flex-col gap-5 min-h-0">
         {/* Brand */}
         <div className="flex items-center gap-2.5 shrink-0">
-           <img src="/logo.svg" alt="logo" className='size-13 '/>
+          <img src="/logo.svg" alt="logo" className="size-13" />
           <div>
             <h1 className="font-serif font-bold text-lg leading-none text-(--text) tracking-tight">RFPilot</h1>
             <span className="text-[9px] uppercase font-bold tracking-wider text-(--muted)">Proposal Engine</span>
@@ -42,9 +37,11 @@ export default function Sidebar() {
         {/* Navigation Links */}
         <nav className="flex flex-col gap-1 text-sm font-medium shrink-0">
           {links.map((link) => {
-            const isActive = link.path === '/dashboard' 
-              ? location.pathname === '/dashboard' 
-              : location.pathname.startsWith(link.path) && !location.pathname.startsWith('/workspace')
+            const isActive =
+              link.path === '/dashboard'
+                ? location.pathname === '/dashboard'
+                : location.pathname.startsWith(link.path) &&
+                  !location.pathname.startsWith('/workspace')
             return (
               <Link
                 key={link.path}
@@ -56,23 +53,25 @@ export default function Sidebar() {
                 to={link.path}
               >
                 <span>{link.name}</span>
-                {isActive && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                )}
+                {isActive && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
               </Link>
             )
           })}
         </nav>
 
-        {/* Workspaces List Section (Tabs) */}
+        {/* Workspaces List */}
         <div className="flex flex-col gap-2 border-t border-(--border) pt-4 min-h-0 flex-1">
           <div className="flex items-center justify-between px-2 mb-1 shrink-0">
             <span className="text-[9.5px] uppercase font-bold tracking-wider text-(--muted)">Workspaces</span>
-            <Link to="/portfolio" className="text-[9.5px] font-bold text-(--accent) hover:underline">Manage</Link>
+            <Link to="/portfolio" className="text-[9.5px] font-bold text-(--accent) hover:underline">
+              Manage
+            </Link>
           </div>
           <div className="flex flex-col gap-1 overflow-y-auto pr-1 grow scrollbar-thin">
             {workspaces.map((ws) => {
-              const isActive = activeWorkspaceId === ws.id && location.pathname.startsWith(`/workspace/${ws.id}`)
+              const isActive =
+                activeWorkspaceId === ws.id &&
+                location.pathname.startsWith(`/workspace/${ws.id}`)
               return (
                 <button
                   key={ws.id}
@@ -86,12 +85,17 @@ export default function Sidebar() {
                       : 'text-(--muted) hover:text-(--text) hover:bg-(--accent-bg) border border-transparent'
                   }`}
                 >
-                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                    ws.status === 'Draft' ? 'bg-amber-400' :
-                    ws.status === 'Analysing' ? 'bg-indigo-400' :
-                    ws.status === 'In Review' ? 'bg-purple-400' :
-                    'bg-emerald-400'
-                  }`} />
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                      ws.status === 'draft'
+                        ? 'bg-amber-400'
+                        : ws.status === 'analysing'
+                          ? 'bg-indigo-400'
+                          : ws.status === 'in_review'
+                            ? 'bg-purple-400'
+                            : 'bg-emerald-400'
+                    }`}
+                  />
                   <span className="truncate flex-1">{ws.name}</span>
                 </button>
               )
@@ -99,42 +103,44 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Active Workspace Monitor (Compact version) */}
+        {/* Active Workspace Monitor */}
         {activeWorkspace && location.pathname.startsWith('/workspace') && (
           <div className="border-t border-(--border) pt-3 shrink-0">
-            <span className="text-[8.5px] uppercase font-bold tracking-wider text-(--muted) block mb-1">Current RFP Target</span>
+            <span className="text-[8.5px] uppercase font-bold tracking-wider text-(--muted) block mb-1">
+              Current RFP Target
+            </span>
             <div className="rounded-xl bg-(--accent-bg) p-2.5 border border-(--border) flex flex-col gap-1">
               <div className="font-serif font-bold text-[11px] text-(--text) truncate leading-tight">
                 {activeWorkspace.name}
               </div>
               <div className="flex justify-between items-center text-[9px] text-(--muted)">
-                <span>{activeWorkspace.sector}</span>
-                <span className="font-bold text-(--accent)">{activeWorkspace.winProbability}% Win</span>
+                <span className="capitalize">{activeWorkspace.sector || '—'}</span>
+                <span className="font-bold text-(--accent) capitalize">{activeWorkspace.status}</span>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* User Info at bottom */}
+      {/* User Info */}
       {user && (
         <div className="border-t border-(--border) pt-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="h-8 w-8 rounded-full bg-(--accent-bg) text-(--accent) border border-(--border) flex items-center justify-center font-bold text-xs shrink-0">
-              {user.avatar}
+              {user.avatar || user.email?.slice(0, 2).toUpperCase()}
             </div>
             <div className="leading-tight min-w-0">
-              <div className="text-xs font-semibold text-(--text) truncate max-w-26.25">{user.name}</div>
-              <div className="text-[10px] text-(--muted) truncate max-w-26.25">{user.role}</div>
+              <div className="text-xs font-semibold text-(--text) truncate max-w-26.25">
+                {user.name || user.email}
+              </div>
+              <div className="text-[10px] text-(--muted) truncate max-w-26.25 capitalize">
+                {user.role}
+              </div>
             </div>
           </div>
-          
-          {/* Logout Button */}
+
           <button
-            onClick={() => {
-              logout()
-              navigate('/')
-            }}
+            onClick={() => { logout(); navigate('/') }}
             title="Sign Out"
             className="rounded-xl p-1.5 text-(--muted) hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/20 transition cursor-pointer border border-transparent hover:border-red-200/40 shrink-0"
           >

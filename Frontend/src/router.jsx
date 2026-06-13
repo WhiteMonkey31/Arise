@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import { Routes, Route, BrowserRouter, Navigate } from 'react-router'
 import AppLayout from './components/layout/AppLayout'
 import AuthLayout from './components/layout/AuthLayout'
 import WorkspaceLayout from './components/layout/WorkspaceLayout'
 import AuthGuard from './components/layout/AuthGuard'
+import LoadingSpinner from './components/ui/LoadingSpinner'
 
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
@@ -18,29 +19,46 @@ import ProposalPage from './pages/workspace/ProposalPage'
 import UploadRFP from './pages/workspace/UploadRFP'
 import WinScorePage from './pages/workspace/WinScorePage'
 
-export default function AppRoutes(){
+// Dev-only — lazy loaded so it's tree-shaken in production builds
+const ApiTestPage = lazy(() => import('./pages/dev/ApiTestPage'))
+
+const isDev = import.meta.env.DEV
+
+export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public Routes */}
+        {/* Public */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<AuthLayout><Login/></AuthLayout>} />
-        <Route path="/register" element={<AuthLayout><Register/></AuthLayout>} />
+        <Route path="/login"    element={<AuthLayout><Login /></AuthLayout>} />
+        <Route path="/register" element={<AuthLayout><Register /></AuthLayout>} />
 
-        {/* Protected App Routes */}
-        <Route element={<AuthGuard><AppLayout/></AuthGuard>}>
-          <Route path="/dashboard" element={<Dashboard/>} />
-          <Route path="/analytics" element={<Analytics/>} />
-          <Route path="/capabilities" element={<CapabilityLibrary/>} />
-          <Route path="/portfolio" element={<Portfolio/>} />
+        {/* Dev-only API test dashboard */}
+        {isDev && (
+          <Route
+            path="/dev/api-test"
+            element={
+              <Suspense fallback={<LoadingSpinner />}>
+                <ApiTestPage />
+              </Suspense>
+            }
+          />
+        )}
 
-          <Route path="/workspace/:workspaceId" element={<WorkspaceLayout/>}>
-            <Route index element={<WorkspaceOverview/>} />
-            <Route path="overview" element={<WorkspaceOverview/>} />
-            <Route path="compliance" element={<CompliancePage/>} />
-            <Route path="proposal" element={<ProposalPage/>} />
-            <Route path="upload" element={<UploadRFP/>} />
-            <Route path="winscore" element={<WinScorePage/>} />
+        {/* Protected */}
+        <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
+          <Route path="/dashboard"   element={<Dashboard />} />
+          <Route path="/analytics"   element={<Analytics />} />
+          <Route path="/capabilities" element={<CapabilityLibrary />} />
+          <Route path="/portfolio"   element={<Portfolio />} />
+
+          <Route path="/workspace/:workspaceId" element={<WorkspaceLayout />}>
+            <Route index           element={<WorkspaceOverview />} />
+            <Route path="overview"   element={<WorkspaceOverview />} />
+            <Route path="compliance" element={<CompliancePage />} />
+            <Route path="proposal"   element={<ProposalPage />} />
+            <Route path="upload"     element={<UploadRFP />} />
+            <Route path="winscore"   element={<WinScorePage />} />
           </Route>
         </Route>
 

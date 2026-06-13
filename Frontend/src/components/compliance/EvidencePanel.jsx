@@ -1,15 +1,17 @@
 import React from 'react'
-import { useWorkspaceStore } from '../../store/workspaceStore'
+import { usePatchCompliance } from '../../hooks/useCompliance'
 import { toastSuccess } from '../ui/ToastProvider'
 
-export default function EvidencePanel({ workspaceId, requirementId }) {
-  const { workspaces, updateRequirementStatus } = useWorkspaceStore()
-  
-  const workspace = workspaces.find(w => w.id === workspaceId)
-  if (!workspace) return null
+/**
+ * EvidencePanel — shows requirement text + capability evidence matches.
+ *
+ * Receives the full compliance item object from CompliancePage
+ * (already fetched via React Query) rather than re-fetching from the store.
+ */
+export default function EvidencePanel({ workspaceId, requirementId, item }) {
+  const patchMutation = usePatchCompliance(workspaceId)
 
-  const requirement = workspace.requirements.find(r => r.id === requirementId)
-  if (!requirement) {
+  if (!item) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-6 text-[var(--muted)] select-none">
         <div className="h-12 w-12 rounded-2xl bg-[var(--accent-bg)] border border-[var(--border)] flex items-center justify-center mb-3 text-[var(--accent)] opacity-60">
@@ -18,64 +20,99 @@ export default function EvidencePanel({ workspaceId, requirementId }) {
           </svg>
         </div>
         <span className="font-serif font-bold text-xs text-[var(--text)]">Select a Requirement</span>
-        <p className="text-[10px] mt-1.5 max-w-[200px] leading-relaxed font-sans font-medium">Click on any requirement row in the compliance table to inspect past performance evidence matches and override tags.</p>
+        <p className="text-[10px] mt-1.5 max-w-[200px] leading-relaxed font-sans font-medium">
+          Click on any requirement row in the compliance table to inspect past performance evidence matches and override tags.
+        </p>
       </div>
     )
   }
 
   const handleStatusChange = (e) => {
-    const newStatus = e.target.value
-    updateRequirementStatus(workspaceId, requirement.id, newStatus)
-    toastSuccess(`Requirement status updated to ${newStatus}`)
+    const newStatus = e.target.value.toLowerCase()
+    patchMutation.mutate(
+      { itemId: item.id, payload: { status: newStatus } },
+      { onSuccess: () => toastSuccess(`Status updated to ${e.target.value}`) }
+    )
   }
+
+  // Build evidence array from the capability object attached to this item
+  const evidence = item.capability
+    ? [{
+        id: String(item.capability.id).slice(0, 8),
+        title: item.capability.title,
+        description: item.capability.certification
+          ? `Certification: ${item.capability.certification}`
+          : 'Past performance capability',
+        match: item.match_score ? Math.round(item.match_score * 100) : null,
+      }]
+    : []
+
+  const currentStatus = (item.status || 'gap').toUpperCase()
 
   return (
     <div className="space-y-6 fade-in select-none">
       {/* Requirement Header */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <span className="font-mono font-bold text-[var(--accent)] text-xs">{requirement.id}</span>
+          <span className="font-mono font-bold text-[var(--accent)] text-xs">
+            {String(item.requirement_id).slice(0, 8)}…
+          </span>
           <div className="flex items-center gap-1.5">
             <span className="text-[9px] uppercase font-bold tracking-wider text-[var(--muted)]">Override:</span>
             <select
-              value={requirement.status}
+              value={currentStatus}
               onChange={handleStatusChange}
-              className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--text)] focus:border-[var(--accent)] focus:outline-hidden transition cursor-pointer shadow-sm"
+              disabled={patchMutation.isPending}
+              className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[10px] font-bold text-[var(--text)] focus:border-[var(--accent)] focus:outline-hidden transition cursor-pointer shadow-sm disabled:opacity-50"
             >
               <option value="PASS">PASS</option>
-              <option value="FAIL">FAIL</option>
+              <option value="PARTIAL">PARTIAL</option>
               <option value="GAP">GAP</option>
             </select>
           </div>
         </div>
-        
-        {/* Quote Block */}
+
+        {/* Requirement text */}
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--accent-bg)] p-4 border-l-2 border-l-[var(--accent)]">
           <p className="font-serif text-[13px] leading-relaxed text-[var(--text)] italic select-text">
-            "{requirement.text}"
+            "{item.requirement_text}"
           </p>
         </div>
+
+        {/* Category / notes */}
+        {(item.requirement_category || item.notes) && (
+          <div className="flex flex-wrap gap-2 text-[10px] text-[var(--muted)] font-medium">
+            {item.requirement_category && (
+              <span className="rounded-lg bg-stone-50 dark:bg-stone-900/30 px-2 py-0.5 border border-[var(--border)]">
+                {item.requirement_category}
+              </span>
+            )}
+            {item.notes && <span className="italic">Note: {item.notes}</span>}
+          </div>
+        )}
       </div>
 
-      {/* Evidence matches list */}
+      {/* Evidence matches */}
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
-          <span className="text-[9px] uppercase font-bold tracking-wider text-[var(--muted)]">Matched Evidence (Semantic)</span>
-          <span className="text-[10px] font-semibold text-[var(--muted)]">{requirement.evidence.length} found</span>
+          <span className="text-[9px] uppercase font-bold tracking-wider text-[var(--muted)]">
+            Matched Evidence (Semantic)
+          </span>
+          <span className="text-[10px] font-semibold text-[var(--muted)]">{evidence.length} found</span>
         </div>
 
-        {requirement.evidence.length === 0 ? (
+        {evidence.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-red-200/80 p-6 text-center space-y-1.5 bg-red-500/[0.01]">
             <span className="font-serif font-bold text-xs text-red-600">Compliance GAP Identified</span>
             <p className="text-[10px] text-[var(--muted)] leading-relaxed max-w-xs mx-auto font-sans font-medium">
-              No previous capability or performance record in our library matches this requirement semantically. You must override or draft custom evidence in the proposal section.
+              No previous capability or performance record matches this requirement. Override the status or draft custom evidence in the proposal section.
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {requirement.evidence.map((ev) => (
-              <div 
-                key={ev.id} 
+            {evidence.map((ev, idx) => (
+              <div
+                key={idx}
                 className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-xs space-y-2 hover:border-[var(--accent)] transition-all"
               >
                 <div className="flex justify-between items-start">
@@ -83,9 +120,11 @@ export default function EvidencePanel({ workspaceId, requirementId }) {
                     <span className="font-mono text-[9px] font-bold text-[var(--accent)]">{ev.id}</span>
                     <h5 className="font-serif font-bold text-xs text-[var(--text)] mt-0.5">{ev.title}</h5>
                   </div>
-                  <span className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-[10px] border border-emerald-100/50 dark:border-emerald-900/10 px-2 py-0.5">
-                    {ev.match}% Match
-                  </span>
+                  {ev.match !== null && (
+                    <span className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 font-mono font-bold text-[10px] border border-emerald-100/50 dark:border-emerald-900/10 px-2 py-0.5">
+                      {ev.match}% Match
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] leading-relaxed text-[var(--muted)] font-medium font-sans">
                   {ev.description}

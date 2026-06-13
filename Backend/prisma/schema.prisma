@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id           String       @id @default(uuid())
+  name         String
+  slug         String       @unique
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  users        User[]
+  workspaces   Workspace[]
+  capabilities Capability[]
+  bidHistory   BidHistory[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  email          String       @unique
+  hashedPassword String
+  role           String       @default("BID_MANAGER")
+  isActive       Boolean      @default(true)
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Workspace {
+  id              String          @id @default(uuid())
+  name            String
+  sector          String          @default("IT Services")
+  deadline        DateTime?
+  status          String          @default("draft")  // draft | analysing | in_review | submitted
+  winProbability  Float?
+  orgId           String
+  organization    Organization    @relation(fields: [orgId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  documents       Document[]
+  complianceItems ComplianceItem[]
+  proposals       Proposal[]
+  jobs            Job[]
+}
+
+model Document {
+  id           String    @id @default(uuid())
+  filename     String
+  originalName String
+  filePath     String    @default("")
+  status       String    @default("PROCESSING")  // PROCESSING | COMPLETED | FAILED
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  orgId        String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Job {
+  id          String    @id @default(uuid())
+  status      String    @default("pending")   // pending | processing | done | failed
+  progressPct Float     @default(0)
+  errorMsg    String?
+  jobType     String    @default("extraction") // extraction | generation
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Capability {
+  id              String          @id @default(uuid())
+  title           String
+  domain          String          @default("General")
+  summary         String          @default("")
+  clientType      String          @default("")
+  contractValue   String          @default("")
+  year            Int?
+  certification   String          @default("None")
+  tags            String          @default("[]")   // JSON array stored as string
+  orgId           String
+  organization    Organization    @relation(fields: [orgId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  complianceItems ComplianceItem[]
+}
+
+model ComplianceItem {
+  id                  String      @id @default(uuid())
+  requirementText     String
+  requirementCategory String      @default("General")
+  status              String      @default("GAP")   // PASS | GAP | PARTIAL
+  matchScore          Float       @default(0)
+  notes               String      @default("")
+  capabilityId        String?
+  capability          Capability? @relation(fields: [capabilityId], references: [id], onDelete: SetNull)
+  workspaceId         String
+  workspace           Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+}
+
+model Proposal {
+  id             String    @id @default(uuid())
+  sectionTitle   String
+  requirementId  String    @default("")
+  aiDraft        String    @default("")
+  currentContent String    @default("")
+  wordCount      Int       @default(0)
+  status         String    @default("draft")     // draft | pending | approved
+  qualityBadge   String    @default("Draft")
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model BidHistory {
+  id             String   @id @default(uuid())
+  bidName        String
+  sector         String
+  score          Float    @default(0)
+  outcome        String   // win | loss
+  compliancePct  Float    @default(0)
+  submittedAt    DateTime @default(now())
+  orgId          String
+  organization   Organization @relation(fields: [orgId], references: [id])
+  createdAt      DateTime @default(now())
+}

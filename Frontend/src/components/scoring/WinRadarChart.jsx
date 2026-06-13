@@ -1,110 +1,115 @@
 import React from 'react'
 
 export default function WinRadarChart({ scoreBreakdown }) {
-  if (!scoreBreakdown) return null
+  if (!scoreBreakdown || scoreBreakdown.length === 0) return null
 
-  const width = 300
-  const height = 300
-  const cx = width / 2
-  const cy = height / 2
-  const r = 90
+  const W = 320, H = 320
+  const cx = W / 2, cy = H / 2
+  const r  = 100
 
-  const getCoordinates = (index, value) => {
-    // 6 axes: 60 degrees apart, starting from top (-90 degrees)
-    const angle = (index * 60 - 90) * (Math.PI / 180)
-    const x = cx + r * (value / 100) * Math.cos(angle)
-    const y = cy + r * (value / 100) * Math.sin(angle)
-    return { x, y }
-  }
-
-  const gridLevels = [20, 40, 60, 80, 100]
-  const renderHexagon = (level) => {
-    const points = []
-    for (let i = 0; i < 6; i++) {
-      const coord = getCoordinates(i, level)
-      points.push(`${coord.x},${coord.y}`)
+  const toXY = (idx, value) => {
+    const angle = (idx * 60 - 90) * (Math.PI / 180)
+    return {
+      x: cx + r * (value / 100) * Math.cos(angle),
+      y: cy + r * (value / 100) * Math.sin(angle),
     }
-    return points.join(' ')
   }
 
-  const scorePoints = scoreBreakdown.map((item, idx) => {
-    const coord = getCoordinates(idx, item.score)
-    return `${coord.x},${coord.y}`
-  }).join(' ')
+  const hexPoints = (level) =>
+    Array.from({ length: 6 }, (_, i) => {
+      const { x, y } = toXY(i, level)
+      return `${x},${y}`
+    }).join(' ')
 
-  const benchmarkPoints = scoreBreakdown.map((item, idx) => {
-    const coord = getCoordinates(idx, item.benchmark)
-    return `${coord.x},${coord.y}`
-  }).join(' ')
+  const scorePoints    = scoreBreakdown.map((d, i) => { const p = toXY(i, d.score);     return `${p.x},${p.y}` }).join(' ')
+  const benchmarkPoints = scoreBreakdown.map((d, i) => { const p = toXY(i, d.benchmark); return `${p.x},${p.y}` }).join(' ')
 
-  const labelOffsets = [
-    { x: 0, y: -12, align: 'middle' },
-    { x: 10, y: -4, align: 'start' },
-    { x: 10, y: 12, align: 'start' },
-    { x: 0, y: 18, align: 'middle' },
-    { x: -10, y: 12, align: 'end' },
-    { x: -10, y: -4, align: 'end' }
+  // Label nudge per axis position (6 axes)
+  const nudge = [
+    { dx:  0,   dy: -16, anchor: 'middle' },
+    { dx:  14,  dy:  -6, anchor: 'start'  },
+    { dx:  14,  dy:  14, anchor: 'start'  },
+    { dx:  0,   dy:  22, anchor: 'middle' },
+    { dx: -14,  dy:  14, anchor: 'end'    },
+    { dx: -14,  dy:  -6, anchor: 'end'    },
   ]
 
   return (
-    <div className="flex justify-center items-center py-4 select-none">
-      <svg width={width} height={height} className="overflow-visible">
-        {/* Hexagonal Grids */}
-        {gridLevels.map((lvl) => (
+    <div className="flex justify-center items-center py-2 select-none w-full">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width={W}
+        height={H}
+        className="overflow-visible max-w-full"
+      >
+        {/* Grid rings */}
+        {[20, 40, 60, 80, 100].map((lvl) => (
           <polygon
             key={lvl}
-            points={renderHexagon(lvl)}
-            className="fill-transparent stroke-stone-200 dark:stroke-stone-800"
+            points={hexPoints(lvl)}
+            fill="none"
+            className="stroke-stone-200 dark:stroke-stone-700/60"
             strokeWidth="0.8"
           />
         ))}
 
-        {/* Axes guidelines */}
-        {[0, 1, 2, 3, 4, 5].map((i) => {
-          const coord = getCoordinates(i, 100)
-          return (
-            <line
-              key={i}
-              x1={cx}
-              y1={cy}
-              x2={coord.x}
-              y2={coord.y}
-              className="stroke-stone-200 dark:stroke-stone-800"
-              strokeWidth="0.8"
-            />
-          )
+        {/* Axis spokes */}
+        {Array.from({ length: 6 }, (_, i) => {
+          const { x, y } = toXY(i, 100)
+          return <line key={i} x1={cx} y1={cy} x2={x} y2={y} className="stroke-stone-200 dark:stroke-stone-700/60" strokeWidth="0.8" />
         })}
 
-        {/* Benchmark Area (dashed) */}
+        {/* Benchmark polygon (dashed) */}
         <polygon
           points={benchmarkPoints}
-          className="fill-transparent stroke-stone-300 dark:stroke-stone-700"
+          fill="none"
+          className="stroke-stone-300 dark:stroke-stone-600"
           strokeWidth="1.5"
-          strokeDasharray="3 3"
+          strokeDasharray="4 3"
         />
 
-        {/* Actual Score Area */}
+        {/* Score polygon with subtle fill */}
         <polygon
           points={scorePoints}
-          className="fill-(--accent)/10 dark:fill-(--accent)/5 stroke-(--accent)"
+          className="stroke-(--accent)"
+          fill="var(--accent)"
+          fillOpacity="0.12"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
 
-        {/* Outer Axis Labels */}
-        {scoreBreakdown.map((item, idx) => {
-          const outerCoord = getCoordinates(idx, 100)
-          const offset = labelOffsets[idx]
+        {/* Score dot on each vertex */}
+        {scoreBreakdown.map((d, i) => {
+          const { x, y } = toXY(i, d.score)
+          return (
+            <circle
+              key={i}
+              cx={x} cy={y} r={3.5}
+              fill="var(--accent)"
+              className="stroke-(--surface)"
+              strokeWidth="1.5"
+            />
+          )
+        })}
+
+        {/* Axis labels — use inline fill so they're always visible */}
+        {scoreBreakdown.map((d, i) => {
+          const { x, y } = toXY(i, 100)
+          const { dx, dy, anchor } = nudge[i]
           return (
             <text
-              key={idx}
-              x={outerCoord.x + offset.x}
-              y={outerCoord.y + offset.y}
-              textAnchor={offset.align}
-              className="fill-(--text) text-[9px] font-bold tracking-tight uppercase"
+              key={i}
+              x={x + dx}
+              y={y + dy}
+              textAnchor={anchor}
+              fontSize="9"
+              fontWeight="700"
+              fontFamily="var(--font-sans)"
+              fill="currentColor"
+              className="text-(--muted) uppercase tracking-wide"
             >
-              {item.name}
+              {d.name}
             </text>
           )
         })}

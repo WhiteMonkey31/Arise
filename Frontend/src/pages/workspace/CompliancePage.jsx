@@ -1,30 +1,30 @@
 import React, { useState } from 'react'
 import { useParams, Link } from 'react-router'
-import { useWorkspaceStore } from '../../store/workspaceStore'
+import { useComplianceData, usePatchCompliance } from '../../hooks/useCompliance'
 import ComplianceTable from '../../components/compliance/ComplianceTable'
 import EvidencePanel from '../../components/compliance/EvidencePanel'
 import EmptyState from '../../components/ui/EmptyState'
+import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 export default function CompliancePage() {
   const { workspaceId } = useParams()
-  const { workspaces, selectedRequirementId, setSelectedRequirement } = useWorkspaceStore()
-  
-  const workspace = workspaces.find(w => w.id === workspaceId)
+  const { data: compliance, isLoading } = useComplianceData(workspaceId)
+  const patchMutation = usePatchCompliance(workspaceId)
+
   const [filter, setFilter] = useState('All')
+  const [selectedItemId, setSelectedItemId] = useState(null)
 
-  if (!workspace) return null
+  if (isLoading) return <div className="flex justify-center py-20"><LoadingSpinner /></div>
 
-  const hasUploaded = workspace.requirements && workspace.requirements.length > 0
-
-  if (!hasUploaded) {
+  if (!compliance || compliance.total === 0) {
     return (
       <EmptyState
         icon="compliance"
         title="No RFP analyzed yet"
         description="To begin compliance evaluation, upload your RFP document (PDF or DOCX). The engine will extract all required items."
       >
-        <Link 
-          to={`/workspace/${workspace.id}/upload`}
+        <Link
+          to={`/workspace/${workspaceId}/upload`}
           className="inline-flex items-center justify-center mt-5 rounded-2xl bg-(--accent) px-4.5 py-3 text-xs font-bold text-white shadow-sm hover:opacity-95 transition cursor-pointer"
         >
           Upload RFP Document
@@ -33,17 +33,25 @@ export default function CompliancePage() {
     )
   }
 
-  const filteredReqs = workspace.requirements.filter((req) => {
+  const { items, total, pass_count, gap_count } = compliance
+  const partial_count = compliance.partial_count ?? 0
+
+  const filteredItems = items.filter((item) => {
     if (filter === 'All') return true
-    return req.status === filter
+    return item.status.toUpperCase() === filter
   })
 
-  const totalCount = workspace.requirements.length
-  const passCount = workspace.requirements.filter(r => r.status === 'PASS').length
-  const gapCount = workspace.requirements.filter(r => r.status === 'GAP').length
-  const failCount = workspace.requirements.filter(r => r.status === 'FAIL').length
+  const filters = ['All', 'PASS', 'GAP', 'PARTIAL']
 
-  const filters = ['All', 'PASS', 'GAP', 'FAIL']
+  const countFor = (f) => {
+    if (f === 'All') return total
+    if (f === 'PASS') return pass_count
+    if (f === 'GAP') return gap_count
+    if (f === 'PARTIAL') return partial_count
+    return 0
+  }
+
+  const selectedItem = items.find((i) => i.id === selectedItemId)
 
   return (
     <div className="space-y-6 fade-in select-none">
@@ -51,22 +59,22 @@ export default function CompliancePage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-(--border) pb-4">
         <div>
           <h3 className="font-serif font-bold text-lg text-(--text)">Compliance Matrix</h3>
-          <p className="text-xs text-(--muted) mt-1 font-medium font-sans">Review requirements extracted from the RFP and check capability alignments.</p>
+          <p className="text-xs text-(--muted) mt-1 font-medium font-sans">
+            Review requirements extracted from the RFP and check capability alignments.
+          </p>
         </div>
 
         {/* Filter Pills */}
         <div className="flex flex-wrap gap-1 bg-stone-100 dark:bg-stone-850 p-1 rounded-2xl border border-(--border) max-w-max self-start lg:self-center">
           {filters.map((f) => {
-            const count = f === 'All' ? totalCount : f === 'PASS' ? passCount : f === 'GAP' ? gapCount : failCount
+            const count = countFor(f)
             const isActive = filter === f
             return (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`rounded-xl px-3.5 py-1.5 text-xs font-bold tracking-tight transition cursor-pointer flex items-center gap-1.5 ${
-                  isActive
-                    ? 'bg-(--accent) text-white shadow-sm'
-                    : 'text-(--muted) hover:text-(--text)'
+                  isActive ? 'bg-(--accent) text-white shadow-sm' : 'text-(--muted) hover:text-(--text)'
                 }`}
               >
                 <span>{f}</span>
@@ -81,20 +89,30 @@ export default function CompliancePage() {
 
       {/* Split Pane Layout */}
       <div className="flex flex-col xl:flex-row gap-6 items-start">
-        {/* Table - 2/3 Width */}
+        {/* Table */}
         <div className="w-full xl:w-2/3 shrink-0">
           <ComplianceTable
-            requirements={filteredReqs}
-            selectedId={selectedRequirementId}
-            onSelect={setSelectedRequirement}
+            requirements={filteredItems.map((item) => ({
+              id: item.id,
+              text: item.requirement_text,
+              category: item.requirement_category,
+              matchScore: item.match_score,
+              status: item.status.toUpperCase(),
+              evidence: item.capability
+                ? [{ id: item.capability.id, title: item.capability.title, description: '', match: item.match_score }]
+                : [],
+            }))}
+            selectedId={selectedItemId}
+            onSelect={setSelectedItemId}
           />
         </div>
 
-        {/* Evidence Panel - 1/3 Width */}
+        {/* Evidence Panel */}
         <div className="w-full xl:w-1/3 rounded-3xl border border-(--border) bg-(--surface) p-5 shadow-xs h-125 overflow-y-auto">
           <EvidencePanel
             workspaceId={workspaceId}
-            requirementId={selectedRequirementId}
+            requirementId={selectedItemId}
+            item={selectedItem}
           />
         </div>
       </div>

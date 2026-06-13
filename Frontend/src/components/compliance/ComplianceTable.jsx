@@ -3,73 +3,70 @@ import StatusBadge from './StatusBadge'
 
 export default function ComplianceTable({ requirements, selectedId, onSelect }) {
   return (
-    <div className="overflow-x-auto border border-[var(--border)] rounded-3xl bg-[var(--surface)] shadow-xs transition-all duration-200">
+    <div className="overflow-x-auto border border-(--border) rounded-3xl bg-(--surface) shadow-[var(--shadow-sm)]">
       <table className="w-full text-xs text-left border-collapse">
         <thead>
-          <tr className="border-b border-[var(--border)] bg-[var(--accent-bg)]/20 text-[var(--muted)] font-bold uppercase tracking-wider text-[9px] sm:text-[10px]">
-            <th className="px-5 py-4 w-16">ID</th>
+          <tr className="border-b border-(--border) bg-(--accent-bg)/30 text-(--muted) font-bold uppercase tracking-wider text-[9px] sm:text-[10px]">
             <th className="px-5 py-4">Requirement</th>
             <th className="px-5 py-4 w-28">Category</th>
             <th className="px-5 py-4 w-24">Type</th>
-            <th className="px-5 py-4 w-28">Capability Fit</th>
+            <th className="px-5 py-4 w-28">Fit</th>
             <th className="px-5 py-4 w-24 text-right">Status</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[var(--border)] font-medium text-[var(--text)]">
+        <tbody className="divide-y divide-(--border) font-medium text-(--text)">
           {requirements.length === 0 ? (
             <tr>
-              <td colSpan="6" className="px-5 py-8 text-center text-[var(--muted)]">
+              <td colSpan="5" className="px-5 py-10 text-center text-(--muted) text-xs">
                 No matching requirements found.
               </td>
             </tr>
           ) : (
-            requirements.map((req) => {
+            requirements.map((req, idx) => {
               const isSelected = req.id === selectedId
               return (
-                <tr 
+                <tr
                   key={req.id}
                   onClick={() => onSelect(req.id)}
-                  className={`cursor-pointer transition-colors ${
-                    isSelected 
-                      ? 'bg-[var(--accent-bg)]/60 hover:bg-[var(--accent-bg)]/70' 
-                      : 'hover:bg-[var(--accent-bg)]/20'
+                  className={`cursor-pointer transition-all duration-150 stagger-fade ${
+                    isSelected
+                      ? 'bg-(--accent-bg)/50 dark:bg-(--accent-bg)/30'
+                      : 'hover:bg-(--accent-bg)/20'
                   }`}
+                  style={{ animationDelay: `${idx * 40}ms` }}
                 >
-                  <td className="px-5 py-4 font-mono font-bold text-[var(--accent)]">{req.id}</td>
                   <td className="px-5 py-4">
-                    <p className="font-serif font-bold text-xs sm:text-[13px] leading-relaxed text-[var(--text)]">{req.text}</p>
+                    <p className="font-serif font-bold text-xs sm:text-[13px] leading-relaxed text-(--text) line-clamp-2">
+                      {req.text}
+                    </p>
                   </td>
                   <td className="px-5 py-4">
-                    <span className="rounded-lg bg-stone-50 dark:bg-stone-900/30 px-2 py-0.5 font-semibold text-[10px] text-[var(--muted)] border border-[var(--border)]">
-                      {req.category}
+                    <span className="rounded-lg bg-stone-50 dark:bg-stone-900/40 px-2 py-0.5 font-semibold text-[10px] text-(--muted) border border-(--border)">
+                      {req.category || '—'}
                     </span>
                   </td>
                   <td className="px-5 py-4">
                     {req.mandatory ? (
-                      <span className="text-[10px] font-bold text-red-600 bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded-lg border border-red-100/50 dark:border-red-900/10">
+                      <span className="text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 px-2 py-0.5 rounded-lg border border-red-100 dark:border-red-900/20">
                         Mandatory
                       </span>
                     ) : (
-                      <span className="text-[10px] font-semibold text-[var(--muted)]">
-                        Optional
-                      </span>
+                      <span className="text-[10px] font-semibold text-(--muted)">Optional</span>
                     )}
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 bg-stone-100 dark:bg-stone-850/80 border border-[var(--border)] rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            req.matchScore >= 80 
-                              ? 'bg-emerald-500' 
-                              : req.matchScore >= 50 
-                              ? 'bg-amber-500' 
-                              : 'bg-red-500'
+                      <div className="h-1.5 w-14 bg-stone-100 dark:bg-stone-800 border border-(--border) rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            (req.matchScore ?? 0) >= 80 ? 'bg-emerald-500'
+                            : (req.matchScore ?? 0) >= 50 ? 'bg-amber-500'
+                            : 'bg-red-500'
                           }`}
-                          style={{ width: `${req.matchScore}%` }}
+                          style={{ width: `${req.matchScore ?? 0}%`, transitionDelay: `${idx * 40 + 100}ms` }}
                         />
                       </div>
-                      <span className="font-semibold font-mono text-[10px]">{req.matchScore}%</span>
+                      <span className="font-mono text-[10px] font-semibold text-(--muted)">{req.matchScore ?? 0}%</span>
                     </div>
                   </td>
                   <td className="px-5 py-4 text-right">
