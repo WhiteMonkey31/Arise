@@ -10,11 +10,10 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Inches, Pt, RGBColor
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.auth.users import current_active_user
-from app.db.database import get_session
+from app.db.database import get_db
 from app.db.models import (
     Capability,
     ComplianceItem,
@@ -25,6 +24,7 @@ from app.db.models import (
     User,
     Workspace,
 )
+from app.db.repository import DbSession
 from app.logger import get_logger
 
 logger = get_logger("export_api")
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api/workspaces", tags=["export"])
 @router.post("/{workspace_id}/export")
 async def export_proposal(
     workspace_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> StreamingResponse:
     """Generate and download a full DOCX proposal document.
@@ -53,18 +53,20 @@ async def export_proposal(
     workspace = await _check_workspace(workspace_id, current_user, session)
 
     # Load proposals
-    proposals_stmt = (
-        select(Proposal)
-        .where(Proposal.workspace_id == workspace_id)
-        .order_by(Proposal.created_at.asc())
+    from app.db.repository import db_query
+    proposals = await db_query(
+        session,
+        Proposal,
+        filters=[("workspace_id", "==", workspace_id)],
+        order_by=("created_at", "asc"),
     )
-    proposals_result = await session.execute(proposals_stmt)
-    proposals = proposals_result.scalars().all()
 
     # Load compliance items
-    comp_stmt = select(ComplianceItem).where(ComplianceItem.workspace_id == workspace_id)
-    comp_result = await session.execute(comp_stmt)
-    compliance_items = comp_result.scalars().all()
+    compliance_items = await db_query(
+        session,
+        ComplianceItem,
+        filters=[("workspace_id", "==", workspace_id)],
+    )
 
     # Generate DOCX
     doc_bytes = await _build_docx(workspace, proposals, compliance_items, session)
@@ -88,7 +90,7 @@ async def _build_docx(
     workspace: Workspace,
     proposals: list,
     compliance_items: list,
-    session: AsyncSession,
+    session: DbSession,
 ) -> bytes:
     """Build the full DOCX document and return as bytes."""
     doc = DocxDocument()
@@ -205,7 +207,7 @@ async def _add_proposal_section(
     doc: DocxDocument,
     proposal: Proposal,
     compliance_items: list,
-    session: AsyncSession,
+    session: DbSession,
 ) -> None:
     """Add a single proposal section to the document."""
     doc.add_heading(proposal.section_title, level=2)
@@ -230,14 +232,15 @@ async def _add_proposal_section(
 async def _add_appendix(
     doc: DocxDocument,
     compliance_items: list,
-    session: AsyncSession,
+    session: DbSession,
 ) -> None:
     """Add appendix with capability details."""
+    from app.db.repository import db_get_by_id
     seen_cap_ids = set()
     for item in compliance_items:
         if item.capability_id and item.capability_id not in seen_cap_ids:
             seen_cap_ids.add(item.capability_id)
-            cap = await session.get(Capability, item.capability_id)
+            cap = await db_get_by_id(session, Capability, item.capability_id)
             if cap:
                 doc.add_heading(cap.title, level=3)
                 doc.add_paragraph(f"Domain: {cap.domain or 'N/A'} | Certification: {cap.certification or 'N/A'} | Year: {cap.year or 'N/A'}")
@@ -249,8 +252,9 @@ async def _add_appendix(
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _check_workspace(workspace_id: UUID, user: User, session: AsyncSession) -> Workspace:
-    workspace = await session.get(Workspace, workspace_id)
+async def _check_workspace(workspace_id: UUID, user: User, session: DbSession) -> Workspace:
+    from app.db.repository import db_get_by_id
+    workspace = await db_get_by_id(session, Workspace, workspace_id)
     if not workspace or workspace.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     if workspace.org_id != user.org_id:

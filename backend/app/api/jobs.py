@@ -9,8 +9,9 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.users import current_active_user
-from app.db.database import get_session
+from app.db.database import get_db
 from app.db.models import Job, JobStatus, User
+from app.db.repository import DbSession
 from app.logger import get_logger
 from app.tasks.celery_app import celery_app
 
@@ -43,7 +44,7 @@ class JobResponse(BaseModel):
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job_status(
     job_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> JobResponse:
     """Get the status and progress of a background job.

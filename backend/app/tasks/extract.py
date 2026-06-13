@@ -55,14 +55,14 @@ def extract_rfp_text(self, job_id: str, document_id: str) -> dict:
 
 async def _extract_rfp_text_async(task, job_id: str, document_id: str) -> dict:
     """Async implementation of the extraction task."""
-    from sqlalchemy.ext.asyncio import AsyncSession
-    from app.db.database import async_session_factory
+    from app.db.database import get_db_session
     from app.db.models import Job, RfpDocument
+    from app.db.repository import db_get_by_id, db_update
     from app.ai.extractor import RFPExtractor
 
-    async with async_session_factory() as session:
-        job = await session.get(Job, UUID(job_id))
-        doc = await session.get(RfpDocument, UUID(document_id))
+    async with get_db_session() as session:
+        job = await db_get_by_id(session, Job, UUID(job_id))
+        doc = await db_get_by_id(session, RfpDocument, UUID(document_id))
 
         if not job or not doc:
             logger.error("Job or document not found", job_id=job_id, document_id=document_id)
@@ -70,10 +70,7 @@ async def _extract_rfp_text_async(task, job_id: str, document_id: str) -> dict:
 
         try:
             # Update status to processing
-            job.status = JobStatus.PROCESSING
-            job.progress_pct = 5
-            session.add(job)
-            await session.commit()
+            await db_update(session, Job, job.id, {"status": JobStatus.PROCESSING, "progress_pct": 5})
 
             # Step 1: Locate file
             file_path = _resolve_file_path(doc.s3_key)
@@ -98,14 +95,17 @@ async def _extract_rfp_text_async(task, job_id: str, document_id: str) -> dict:
             )
 
             # Step 3: Save text to document
-            doc.extracted_text = extracted_text
-            doc.status = DocumentStatus.PROCESSING
-            session.add(doc)
-            await session.commit()
+            await db_update(
+                session,
+                RfpDocument,
+                doc.id,
+                {
+                    "extracted_text": extracted_text,
+                    "status": DocumentStatus.PROCESSING,
+                },
+            )
 
-            job.progress_pct = 30
-            session.add(job)
-            await session.commit()
+            await db_update(session, Job, job.id, {"progress_pct": 30})
             task.update_state(state="STARTED", meta={"progress": 30})
 
             # Step 4: AI extraction → requirements
@@ -127,6 +127,7 @@ async def _extract_rfp_text_async(task, job_id: str, document_id: str) -> dict:
             # Step 5: Queue capability matching
             from app.tasks.match import match_capabilities
             from app.db.models import Job as JobModel
+            from app.db.repository import db_create
 
             match_job = JobModel(
                 workspace_id=doc.workspace_id,
@@ -134,10 +135,7 @@ async def _extract_rfp_text_async(task, job_id: str, document_id: str) -> dict:
                 status=JobStatus.PENDING,
                 progress_pct=0,
             )
-            session.add(match_job)
-            await session.flush()
-            await session.refresh(match_job)
-            await session.commit()
+            await db_create(session, match_job)
 
             celery_app.send_task(
                 "tasks.match.match_capabilities",
@@ -146,10 +144,7 @@ async def _extract_rfp_text_async(task, job_id: str, document_id: str) -> dict:
             )
 
             # Step 6: Mark job done
-            job.status = JobStatus.DONE
-            job.progress_pct = 100
-            session.add(job)
-            await session.commit()
+            await db_update(session, Job, job.id, {"status": JobStatus.DONE, "progress_pct": 100})
 
             logger.info(
                 "Extraction task complete",
@@ -160,12 +155,18 @@ async def _extract_rfp_text_async(task, job_id: str, document_id: str) -> dict:
 
         except Exception as exc:
             logger.error("Extraction task failed", error=str(exc), job_id=job_id)
-            doc.status = DocumentStatus.FAILED
-            session.add(doc)
-            job.status = JobStatus.FAILED
-            job.error_msg = str(exc)
-            session.add(job)
-            await session.commit()
+            await db_update(
+                session,
+                RfpDocument,
+                doc.id,
+                {"status": DocumentStatus.FAILED},
+            )
+            await db_update(
+                session,
+                Job,
+                job.id,
+                {"status": JobStatus.FAILED, "error_msg": str(exc)},
+            )
 
             try:
                 raise task.retry(exc=exc)

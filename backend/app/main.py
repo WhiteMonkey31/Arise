@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.db.database import create_tables
+from app.db.firebase_client import init_firestore_client
 from app.logger import get_logger, setup_logging
 from app.middleware.cost_tracker import CostTrackerMiddleware
 
@@ -69,6 +70,14 @@ def create_app() -> FastAPI:
 
     @app.get("/ready", tags=["system"])
     async def ready():
+        if settings.FIREBASE_ENABLED:
+            try:
+                init_firestore_client()
+                return {"status": "ready"}
+            except Exception as exc:
+                logger.error("Readiness check failed", error=str(exc))
+                return JSONResponse(status_code=503, content={"status": "not_ready"})
+
         from app.db.database import engine
         import sqlalchemy
         try:

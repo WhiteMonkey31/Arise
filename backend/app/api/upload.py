@@ -16,8 +16,9 @@ from sqlmodel import select
 
 from app.auth.users import current_active_user
 from app.config import settings
-from app.db.database import get_session
+from app.db.database import get_db
 from app.db.models import DocumentStatus, Job, JobStatus, RfpDocument, User, Workspace
+from app.db.repository import DbSession
 from app.logger import get_logger
 from app.tasks.celery_app import celery_app
 
@@ -62,7 +63,7 @@ class DocumentResponse(BaseModel):
 async def upload_document(
     workspace_id: UUID,
     file: UploadFile = File(...),
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> UploadResponse:
     """Upload an RFP document (PDF or DOCX) and queue extraction.
@@ -115,15 +116,14 @@ async def upload_document(
             raise HTTPException(status_code=500, detail="File storage failed")
 
     # Create document record
+    from app.db.repository import db_create
     doc = RfpDocument(
         workspace_id=workspace_id,
         filename=file.filename or safe_filename,
         s3_key=s3_key,
         status=DocumentStatus.PENDING,
     )
-    session.add(doc)
-    await session.flush()
-    await session.refresh(doc)
+    doc = await db_create(session, doc)
 
     # Create job record
     job = Job(
@@ -132,9 +132,7 @@ async def upload_document(
         status=JobStatus.PENDING,
         progress_pct=0,
     )
-    session.add(job)
-    await session.flush()
-    await session.refresh(job)
+    job = await db_create(session, job)
 
     # Queue Celery task
     task = celery_app.send_task(
@@ -142,8 +140,9 @@ async def upload_document(
         args=[str(job.id), str(doc.id)],
         task_id=str(job.id),
     )
-    job.task_id = task.id
-    session.add(job)
+    # Update job with task ID
+    from app.db.repository import db_update
+    job = await db_update(session, Job, job.id, {"task_id": task.id})
 
     logger.info(
         "Document uploaded, extraction queued",
@@ -163,19 +162,19 @@ async def upload_document(
 @router.get("/{workspace_id}/documents", response_model=List[DocumentResponse])
 async def list_documents(
     workspace_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> List[DocumentResponse]:
     """List all documents for a workspace."""
     await _check_workspace(workspace_id, current_user, session)
 
-    stmt = (
-        select(RfpDocument)
-        .where(RfpDocument.workspace_id == workspace_id)
-        .order_by(RfpDocument.created_at.desc())
+    from app.db.repository import db_query
+    docs = await db_query(
+        session,
+        RfpDocument,
+        filters=[("workspace_id", "==", workspace_id)],
+        order_by=("created_at", "desc"),
     )
-    result = await session.execute(stmt)
-    docs = result.scalars().all()
     return [DocumentResponse.model_validate(d) for d in docs]
 
 
@@ -186,9 +185,10 @@ async def list_documents(
 async def _check_workspace(
     workspace_id: UUID,
     user: User,
-    session: AsyncSession,
+    session: DbSession,
 ) -> Workspace:
-    workspace = await session.get(Workspace, workspace_id)
+    from app.db.repository import db_get_by_id
+    workspace = await db_get_by_id(session, Workspace, workspace_id)
     if not workspace or workspace.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     if workspace.org_id != user.org_id:

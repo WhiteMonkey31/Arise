@@ -12,8 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.auth.users import current_active_user
-from app.db.database import get_session
+from app.db.database import get_db
 from app.db.models import Capability, User
+from app.db.repository import DbSession
 from app.logger import get_logger
 from app.rag.embedder import embedder
 from app.rag.vectorstore import vector_store
@@ -78,36 +79,39 @@ async def list_capabilities(
     search: Optional[str] = Query(default=None),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0),
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> List[CapabilityResponse]:
     """List capabilities with optional filters."""
-    stmt = select(Capability).where(Capability.org_id == current_user.org_id)
-
+    from app.db.repository import db_query
+    
+    filters = [("org_id", "==", current_user.org_id)]
     if domain:
-        stmt = stmt.where(Capability.domain.ilike(f"%{domain}%"))
+        filters.append(("domain", "==", domain))
     if certification:
-        stmt = stmt.where(Capability.certification.ilike(f"%{certification}%"))
+        filters.append(("certification", "==", certification))
     if year:
-        stmt = stmt.where(Capability.year == year)
-    if search:
-        stmt = stmt.where(
-            (Capability.title.ilike(f"%{search}%")) | (Capability.description.ilike(f"%{search}%"))
-        )
-
-    stmt = stmt.offset(offset).limit(limit).order_by(Capability.created_at.desc())
-    result = await session.execute(stmt)
-    caps = result.scalars().all()
+        filters.append(("year", "==", year))
+    
+    caps = await db_query(
+        session,
+        Capability,
+        filters=filters,
+        order_by=("created_at", "desc"),
+        limit=limit,
+        offset=offset,
+    )
     return [CapabilityResponse.model_validate(c) for c in caps]
 
 
 @router.post("", response_model=CapabilityResponse, status_code=status.HTTP_201_CREATED)
 async def create_capability(
     payload: CapabilityCreate,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> CapabilityResponse:
     """Create a capability, embed it, and store in ChromaDB."""
+    from app.db.repository import db_create
     cap = Capability(
         org_id=current_user.org_id,
         title=payload.title,
@@ -117,9 +121,7 @@ async def create_capability(
         year=payload.year,
         client_type=payload.client_type,
     )
-    session.add(cap)
-    await session.flush()
-    await session.refresh(cap)
+    cap = await db_create(session, cap)
 
     # Embed and store in ChromaDB
     combined_text = f"{cap.title}. {cap.description}"
@@ -137,8 +139,8 @@ async def create_capability(
             "client_type": cap.client_type or "",
         },
     )
-    cap.embedding_id = str(cap.id)
-    session.add(cap)
+    from app.db.repository import db_update
+    cap = await db_update(session, Capability, cap.id, {"embedding_id": str(cap.id)})
 
     logger.info("Capability created and embedded", capability_id=str(cap.id))
     return CapabilityResponse.model_validate(cap)
@@ -148,19 +150,18 @@ async def create_capability(
 async def update_capability(
     capability_id: UUID,
     payload: CapabilityUpdate,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> CapabilityResponse:
     """Update a capability and re-embed in ChromaDB."""
+    from app.db.repository import db_get_by_id, db_update
     cap = await _get_owned_capability(capability_id, current_user, session)
 
     update_data = payload.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(cap, field, value)
-    cap.updated_at = datetime.utcnow()
-    session.add(cap)
-    await session.flush()
-    await session.refresh(cap)
+    await db_update(session, Capability, capability_id, {
+        **update_data,
+        "updated_at": datetime.utcnow(),
+    })
 
     # Re-embed
     combined_text = f"{cap.title}. {cap.description}"
@@ -185,20 +186,21 @@ async def update_capability(
 @router.delete("/{capability_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_capability(
     capability_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> None:
     """Delete a capability from DB and ChromaDB."""
+    from app.db.repository import db_delete
     cap = await _get_owned_capability(capability_id, current_user, session)
     vector_store.delete_capability(str(cap.id))
-    await session.delete(cap)
+    await db_delete(session, Capability, capability_id)
     logger.info("Capability deleted", capability_id=str(capability_id))
 
 
 @router.post("/import", response_model=ImportResponse, status_code=status.HTTP_201_CREATED)
 async def import_capabilities(
     file: UploadFile = File(...),
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> ImportResponse:
     """Batch import capabilities from an XLSX file.
@@ -241,6 +243,7 @@ async def import_capabilities(
     embedding_idx = 0
     for _, row in df.iterrows():
         try:
+            from app.db.repository import db_create
             title = str(row.get("title", "")).strip()
             description = str(row.get("description", "")).strip()
             if not title or not description:
@@ -257,13 +260,11 @@ async def import_capabilities(
                 year=int(row["year"]) if "year" in row and pd.notna(row["year"]) else None,
                 client_type=str(row["client_type"]) if "client_type" in row and pd.notna(row["client_type"]) else None,
             )
-            session.add(cap)
-            await session.flush()
-            await session.refresh(cap)
+            cap = await db_create(session, cap)
 
             # Store embedding
-            cap.embedding_id = str(cap.id)
-            session.add(cap)
+            from app.db.repository import db_update
+            cap = await db_update(session, Capability, cap.id, {"embedding_id": str(cap.id)})
 
             vector_store.add_capability(
                 capability_id=str(cap.id),
@@ -293,9 +294,10 @@ async def import_capabilities(
 async def _get_owned_capability(
     capability_id: UUID,
     user: User,
-    session: AsyncSession,
+    session: DbSession,
 ) -> Capability:
-    cap = await session.get(Capability, capability_id)
+    from app.db.repository import db_get_by_id
+    cap = await db_get_by_id(session, Capability, capability_id)
     if not cap:
         raise HTTPException(status_code=404, detail="Capability not found")
     if cap.org_id != user.org_id:

@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(...)
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    FIREBASE_ENABLED: bool = False
+    FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_CREDENTIALS_PATH: Optional[str] = None
+    FIREBASE_CREDENTIALS_JSON: Optional[str] = None
+
     CHROMADB_HOST: str = "localhost"
     CHROMADB_PORT: int = 8001
 

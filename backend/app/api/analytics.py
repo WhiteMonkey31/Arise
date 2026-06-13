@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.auth.users import current_active_user
-from app.db.database import get_session
+from app.db.database import get_db
 from app.db.models import Bid, User
+from app.db.repository import DbSession
 from app.logger import get_logger
 
 logger = get_logger("analytics_api")
@@ -62,7 +63,7 @@ async def get_bid_history(
     sector: Optional[str] = Query(default=None),
     outcome: Optional[str] = Query(default=None),
     limit: int = Query(default=120, le=500),
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> List[BidHistoryRow]:
     """Return bid history rows (up to 120 by default) for the org."""
@@ -93,7 +94,7 @@ async def get_bid_history(
 
 @router.get("/win-rate-by-sector", response_model=List[WinRateBySector])
 async def get_win_rate_by_sector(
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> List[WinRateBySector]:
     """Return win rate grouped by sector."""
@@ -138,7 +139,7 @@ async def get_win_rate_by_sector(
 
 @router.get("/score-vs-outcome", response_model=List[ScoreVsOutcomePoint])
 async def get_score_vs_outcome(
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> List[ScoreVsOutcomePoint]:
     """Return score vs win/loss scatter data for all scored bids."""
@@ -163,7 +164,7 @@ async def get_score_vs_outcome(
 
 @router.get("/compliance-vs-win-rate", response_model=List[ComplianceVsWinRate])
 async def get_compliance_vs_win_rate(
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> List[ComplianceVsWinRate]:
     """Return compliance % bucketed vs win rate for correlation chart."""

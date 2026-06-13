@@ -8,7 +8,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.users import current_active_user
-from app.db.database import get_session
+from app.db.database import get_db
+from app.db.repository import DbSession
 from app.db.models import User, Workspace
 from app.scoring.win_score import WinScoreEngine
 from app.ai.decision import DecisionEngine
@@ -58,7 +59,7 @@ class GoNoGoResponse(BaseModel):
 @router.get("/{workspace_id}/win-score", response_model=WinScoreResponse)
 async def get_win_score(
     workspace_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> WinScoreResponse:
     """Compute and return the win probability score with all 6 axes."""
@@ -84,7 +85,7 @@ async def get_win_score(
 @router.get("/{workspace_id}/go-no-go", response_model=GoNoGoResponse)
 async def get_go_no_go(
     workspace_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> GoNoGoResponse:
     """Get GO/NO-GO decision with AI-generated reasoning."""
@@ -116,7 +117,7 @@ async def get_go_no_go(
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _check_workspace(workspace_id: UUID, user: User, session: AsyncSession) -> Workspace:
+async def _check_workspace(workspace_id: UUID, user: User, session: DbSession) -> Workspace:
     workspace = await session.get(Workspace, workspace_id)
     if not workspace or workspace.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Workspace not found")

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -8,11 +8,11 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.config import settings
-from app.db.database import get_session
+from app.db.database import get_db
 from app.db.models import Organization, User, UserRole
+from app.db.repository import DbSession, db_create, db_get_by_id, db_query
 from app.logger import get_logger
 
 logger = get_logger("auth")
@@ -32,7 +32,7 @@ def hash_password(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     payload = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     payload["exp"] = expire
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=ALGORITHM)
 
@@ -66,70 +66,65 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=201)
-async def register(payload: RegisterRequest, session: AsyncSession = Depends(get_session)):
-    existing = await session.execute(select(User).where(User.email == payload.email))
-    if existing.scalars().first():
+async def register(payload: RegisterRequest, session: DbSession | None = Depends(get_db)):
+    existing = await db_query(User, session, filters=[("email", "==", payload.email)])
+    if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
     slug = payload.org_name.lower().replace(" ", "-")[:100]
-    slug_check = await session.execute(select(Organization).where(Organization.slug == slug))
-    if slug_check.scalars().first():
-        slug = f"{slug}-{datetime.utcnow().strftime('%H%M%S')}"
+    slug_check = await db_query(session, Organization, filters=[("slug", "==", slug)])
+    if slug_check:
+        slug = f"{slug}-{datetime.now(timezone.utc).strftime('%H%M%S')}"
 
     org = Organization(name=payload.org_name, slug=slug)
-    session.add(org)
-    await session.flush()
-    await session.refresh(org)
+    org = await db_create(session, org)
 
     user = User(
         email=payload.email,
         hashed_password=hash_password(payload.password),
-        org_id=org.id,
+        org_id=UUID(str(org["id"] if isinstance(org, dict) else org.id)),
         role=payload.role,
         is_active=True,
     )
-    session.add(user)
-    await session.flush()
-    await session.refresh(user)
+    user = await db_create(session, user)
 
-    logger.info("User registered", email=payload.email, org_id=str(org.id))
+    logger.info("User registered", email=payload.email, org_id=str(org["id"] if isinstance(org, dict) else org.id))
     return UserResponse.model_validate(user)
 
 
 @router.post("/token", response_model=Token)
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    session: AsyncSession = Depends(get_session),
+    session: DbSession | None = Depends(get_db),
 ):
-    result = await session.execute(select(User).where(User.email == form_data.username))
-    user = result.scalars().first()
+    users = await db_query(session, User, filters=[("email", "==", form_data.username)])
+    user = users[0] if users else None
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(form_data.password, user["hashed_password"] if isinstance(user, dict) else user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if not user.is_active:
+    is_active = user["is_active"] if isinstance(user, dict) else user.is_active
+    if not is_active:
         raise HTTPException(status_code=400, detail="Account is inactive")
 
+    user_id = str(user["id"] if isinstance(user, dict) else user.id)
+    org_id = str(user["org_id"] if isinstance(user, dict) else user.org_id)
+    role = user["role"] if isinstance(user, dict) else user.role.value
     token = create_access_token({
-        "sub": str(user.id),
-        "org_id": str(user.org_id),
-        "role": user.role.value,
+        "sub": user_id,
+        "org_id": org_id,
+        "role": role,
     })
-    logger.info("User logged in", user_id=str(user.id))
-    return Token(access_token=token, user_id=str(user.id), org_id=str(user.org_id), role=user.role.value)
-
-
-@router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(current_active_user)):
-    return UserResponse.model_validate(current_user)
+    logger.info("User logged in", user_id=user_id)
+    return Token(access_token=token, user_id=user_id, org_id=org_id, role=role)
 
 
 async def current_active_user(
     token: str = Depends(oauth2_scheme),
-    session: AsyncSession = Depends(get_session),
+    session: DbSession | None = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -144,9 +139,15 @@ async def current_active_user(
     except JWTError:
         raise credentials_exception
 
-    user = await session.get(User, UUID(user_id))
+    user = await db_get_by_id(session, User, UUID(user_id))
     if not user:
         raise credentials_exception
-    if not user.is_active:
+    is_active = user["is_active"] if isinstance(user, dict) else user.is_active
+    if not is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(current_active_user)):
+    return UserResponse.model_validate(current_user)

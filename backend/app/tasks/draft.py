@@ -44,35 +44,31 @@ def draft_proposals(self, job_id: str, workspace_id: str) -> dict:
 
 
 async def _draft_proposals_async(task, job_id: str, workspace_id: str) -> dict:
-    from app.db.database import async_session_factory
+    from app.db.database import get_db_session
     from app.db.models import Job, Requirement, Workspace
+    from app.db.repository import db_get_by_id, db_query, db_update
     from app.ai.drafter import ProposalDrafter
     from app.ai.quality_scorer import QualityScorer
-    from sqlmodel import select
 
-    async with async_session_factory() as session:
-        job = await session.get(Job, UUID(job_id))
-        workspace = await session.get(Workspace, UUID(workspace_id))
+    async with get_db_session() as session:
+        job = await db_get_by_id(session, Job, UUID(job_id))
+        workspace = await db_get_by_id(session, Workspace, UUID(workspace_id))
 
         if not job or not workspace:
             return {"status": "failed", "error": "Job or workspace not found"}
 
         try:
-            job.status = JobStatus.PROCESSING
-            job.progress_pct = 5
-            session.add(job)
-            await session.commit()
+            await db_update(session, Job, job.id, {"status": JobStatus.PROCESSING, "progress_pct": 5})
 
             # Load requirements for workspace
-            stmt = select(Requirement).where(Requirement.workspace_id == UUID(workspace_id))
-            result = await session.execute(stmt)
-            requirements = result.scalars().all()
+            requirements = await db_query(
+                session,
+                Requirement,
+                filters=[("workspace_id", "==", workspace_id)],
+            )
 
             if not requirements:
-                job.status = JobStatus.DONE
-                job.progress_pct = 100
-                session.add(job)
-                await session.commit()
+                await db_update(session, Job, job.id, {"status": JobStatus.DONE, "progress_pct": 100})
                 return {"status": "done", "n_drafted": 0}
 
             drafter = ProposalDrafter()
@@ -112,16 +108,11 @@ async def _draft_proposals_async(task, job_id: str, workspace_id: str) -> dict:
 
                 # Update progress
                 progress = int((idx + 1) / n_requirements * 90)
-                job.progress_pct = progress
-                session.add(job)
-                await session.commit()
+                await db_update(session, Job, job.id, {"progress_pct": progress})
                 task.update_state(state="STARTED", meta={"progress": progress})
 
             # Mark done
-            job.status = JobStatus.DONE
-            job.progress_pct = 100
-            session.add(job)
-            await session.commit()
+            await db_update(session, Job, job.id, {"status": JobStatus.DONE, "progress_pct": 100})
 
             logger.info(
                 "Draft task complete",
@@ -132,10 +123,12 @@ async def _draft_proposals_async(task, job_id: str, workspace_id: str) -> dict:
 
         except Exception as exc:
             logger.error("Draft task failed", error=str(exc), job_id=job_id)
-            job.status = JobStatus.FAILED
-            job.error_msg = str(exc)
-            session.add(job)
-            await session.commit()
+            await db_update(
+                session,
+                Job,
+                job.id,
+                {"status": JobStatus.FAILED, "error_msg": str(exc)},
+            )
             try:
                 raise task.retry(exc=exc)
             except Exception:

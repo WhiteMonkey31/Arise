@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.auth.users import current_active_user
-from app.db.database import get_session
+from app.db.database import get_db
 from app.db.models import Capability, ComplianceItem, ComplianceStatus, Requirement, User, Workspace
+from app.db.repository import DbSession
 from app.logger import get_logger
 
 logger = get_logger("compliance_api")
@@ -56,15 +57,17 @@ class ComplianceItemUpdate(BaseModel):
 @router.get("/{workspace_id}/compliance", response_model=ComplianceSummary)
 async def get_compliance(
     workspace_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ):
     await _check_workspace(workspace_id, current_user, session)
 
-    result = await session.execute(
-        select(ComplianceItem).where(ComplianceItem.workspace_id == workspace_id)
+    from app.db.repository import db_query, db_get_by_id
+    items = await db_query(
+        session,
+        ComplianceItem,
+        filters=[("workspace_id", "==", workspace_id)],
     )
-    items = result.scalars().all()
 
     pass_count = sum(1 for i in items if i.status == ComplianceStatus.PASS)
     partial_count = sum(1 for i in items if i.status == ComplianceStatus.PARTIAL)
@@ -74,10 +77,10 @@ async def get_compliance(
 
     enriched = []
     for item in items:
-        req = await session.get(Requirement, item.requirement_id)
+        req = await db_get_by_id(session, Requirement, item.requirement_id)
         cap = None
         if item.capability_id:
-            cap_obj = await session.get(Capability, item.capability_id)
+            cap_obj = await db_get_by_id(session, Capability, item.capability_id)
             if cap_obj:
                 cap = CapabilityBrief(id=cap_obj.id, title=cap_obj.title, domain=cap_obj.domain, certification=cap_obj.certification)
 
@@ -102,12 +105,13 @@ async def update_compliance_item(
     workspace_id: UUID,
     item_id: UUID,
     payload: ComplianceItemUpdate,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ):
     await _check_workspace(workspace_id, current_user, session)
 
-    item = await session.get(ComplianceItem, item_id)
+    from app.db.repository import db_get_by_id, db_update
+    item = await db_get_by_id(session, ComplianceItem, item_id)
     if not item or item.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Compliance item not found")
 
@@ -119,13 +123,17 @@ async def update_compliance_item(
         item.capability_id = payload.capability_id
     item.updated_at = datetime.utcnow()
 
-    session.add(item)
-    await session.flush()
+    await db_update(session, ComplianceItem, item.id, {
+        "status": item.status if payload.status is not None else item.status,
+        "notes": item.notes if payload.notes is not None else item.notes,
+        "capability_id": item.capability_id if payload.capability_id is not None else item.capability_id,
+        "updated_at": datetime.utcnow(),
+    })
 
-    req = await session.get(Requirement, item.requirement_id)
+    req = await db_get_by_id(session, Requirement, item.requirement_id)
     cap = None
     if item.capability_id:
-        cap_obj = await session.get(Capability, item.capability_id)
+        cap_obj = await db_get_by_id(session, Capability, item.capability_id)
         if cap_obj:
             cap = CapabilityBrief(id=cap_obj.id, title=cap_obj.title, domain=cap_obj.domain, certification=cap_obj.certification)
 
@@ -138,8 +146,9 @@ async def update_compliance_item(
     )
 
 
-async def _check_workspace(workspace_id: UUID, user: User, session: AsyncSession) -> Workspace:
-    workspace = await session.get(Workspace, workspace_id)
+async def _check_workspace(workspace_id: UUID, user: User, session: DbSession) -> Workspace:
+    from app.db.repository import db_get_by_id
+    workspace = await db_get_by_id(session, Workspace, workspace_id)
     if not workspace or workspace.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     if workspace.org_id != user.org_id:

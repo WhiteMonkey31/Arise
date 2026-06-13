@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from app.auth.users import current_active_user
-from app.db.database import get_session
+from app.db.database import get_db
 from app.db.models import (
     Job,
     JobStatus,
@@ -26,6 +26,7 @@ from app.db.models import (
 from app.ai.drafter import ProposalDrafter
 from app.logger import get_logger
 from app.tasks.celery_app import celery_app
+from app.db.repository import DbSession
 
 logger = get_logger("proposals_api")
 router = APIRouter(prefix="/api/workspaces", tags=["proposals"])
@@ -73,19 +74,19 @@ class GenerateProposalsResponse(BaseModel):
 @router.get("/{workspace_id}/proposals", response_model=List[ProposalResponse])
 async def list_proposals(
     workspace_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> List[ProposalResponse]:
     """Return all proposal sections for a workspace."""
     await _check_workspace(workspace_id, current_user, session)
 
-    stmt = (
-        select(Proposal)
-        .where(Proposal.workspace_id == workspace_id)
-        .order_by(Proposal.created_at.asc())
+    from app.db.repository import db_query
+    proposals = await db_query(
+        session,
+        Proposal,
+        filters=[("workspace_id", "==", workspace_id)],
+        order_by=("created_at", "asc"),
     )
-    result = await session.execute(stmt)
-    proposals = result.scalars().all()
     return [ProposalResponse.model_validate(p) for p in proposals]
 
 
@@ -96,7 +97,7 @@ async def list_proposals(
 )
 async def generate_proposals(
     workspace_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> GenerateProposalsResponse:
     """Queue full proposal drafting for all requirements in this workspace."""
@@ -108,17 +109,16 @@ async def generate_proposals(
         status=JobStatus.PENDING,
         progress_pct=0,
     )
-    session.add(job)
-    await session.flush()
-    await session.refresh(job)
+    from app.db.repository import db_create
+    job = await db_create(session, job)
 
     task = celery_app.send_task(
         "tasks.draft.draft_proposals",
         args=[str(job.id), str(workspace_id)],
         task_id=str(job.id),
     )
-    job.task_id = task.id
-    session.add(job)
+    from app.db.repository import db_update
+    await db_update(session, Job, job.id, {"task_id": task.id})
 
     logger.info("Proposal drafting queued", workspace_id=str(workspace_id), job_id=str(job.id))
     return GenerateProposalsResponse(job_id=job.id, message="Proposal drafting queued")
@@ -128,7 +128,7 @@ async def generate_proposals(
 async def get_proposal(
     workspace_id: UUID,
     section_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> ProposalResponse:
     """Get a single proposal section."""
@@ -142,7 +142,7 @@ async def update_proposal(
     workspace_id: UUID,
     section_id: UUID,
     payload: ProposalUpdate,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> ProposalResponse:
     """Update a proposal section's content (saves version history)."""
@@ -150,13 +150,15 @@ async def update_proposal(
     proposal = await _get_proposal(workspace_id, section_id, session)
 
     # Save current content as version
-    version_stmt = (
-        select(ProposalVersion)
-        .where(ProposalVersion.proposal_id == section_id)
-        .order_by(ProposalVersion.version_num.desc())
+    from app.db.repository import db_query, db_create, db_update
+    version_items = await db_query(
+        session,
+        ProposalVersion,
+        filters=[("proposal_id", "==", section_id)],
+        order_by=("version_num", "desc"),
+        limit=1,
     )
-    ver_result = await session.execute(version_stmt)
-    latest_version = ver_result.scalars().first()
+    latest_version = version_items[0] if version_items else None
     next_version_num = (latest_version.version_num + 1) if latest_version else 1
 
     version = ProposalVersion(
@@ -164,17 +166,20 @@ async def update_proposal(
         content=proposal.current_content or "",
         version_num=next_version_num,
     )
-    session.add(version)
+    await db_create(session, version)
 
     # Update proposal
-    proposal.current_content = payload.current_content
-    proposal.word_count = len(payload.current_content.split())
-    if payload.section_title:
-        proposal.section_title = payload.section_title
-    proposal.updated_at = datetime.utcnow()
-    session.add(proposal)
-    await session.flush()
-    await session.refresh(proposal)
+    proposal = await db_update(
+        session,
+        Proposal,
+        section_id,
+        {
+            "current_content": payload.current_content,
+            "word_count": len(payload.current_content.split()),
+            "section_title": payload.section_title or proposal.section_title,
+            "updated_at": datetime.utcnow(),
+        },
+    )
 
     logger.info("Proposal section updated", proposal_id=str(section_id))
     return ProposalResponse.model_validate(proposal)
@@ -184,7 +189,7 @@ async def update_proposal(
 async def regenerate_proposal(
     workspace_id: UUID,
     section_id: UUID,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> StreamingResponse:
     """Regenerate a proposal section with SSE streaming."""
@@ -234,18 +239,23 @@ async def update_proposal_status(
     workspace_id: UUID,
     section_id: UUID,
     payload: ProposalStatusUpdate,
-    session: AsyncSession = Depends(get_session),
+    session: DbSession = Depends(get_db),
     current_user: User = Depends(current_active_user),
 ) -> ProposalResponse:
     """Approve or reject a proposal section."""
     await _check_workspace(workspace_id, current_user, session)
     proposal = await _get_proposal(workspace_id, section_id, session)
 
-    proposal.status = payload.status
-    proposal.updated_at = datetime.utcnow()
-    session.add(proposal)
-    await session.flush()
-    await session.refresh(proposal)
+    from app.db.repository import db_update
+    proposal = await db_update(
+        session,
+        Proposal,
+        section_id,
+        {
+            "status": payload.status,
+            "updated_at": datetime.utcnow(),
+        },
+    )
 
     logger.info("Proposal status updated", proposal_id=str(section_id), status=payload.status)
     return ProposalResponse.model_validate(proposal)
@@ -255,8 +265,9 @@ async def update_proposal_status(
 # Helpers
 # ---------------------------------------------------------------------------
 
-async def _check_workspace(workspace_id: UUID, user: User, session: AsyncSession) -> Workspace:
-    workspace = await session.get(Workspace, workspace_id)
+async def _check_workspace(workspace_id: UUID, user: User, session: DbSession) -> Workspace:
+    from app.db.repository import db_get_by_id
+    workspace = await db_get_by_id(session, Workspace, workspace_id)
     if not workspace or workspace.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Workspace not found")
     if workspace.org_id != user.org_id:
@@ -267,9 +278,10 @@ async def _check_workspace(workspace_id: UUID, user: User, session: AsyncSession
 async def _get_proposal(
     workspace_id: UUID,
     proposal_id: UUID,
-    session: AsyncSession,
+    session: DbSession,
 ) -> Proposal:
-    proposal = await session.get(Proposal, proposal_id)
+    from app.db.repository import db_get_by_id
+    proposal = await db_get_by_id(session, Proposal, proposal_id)
     if not proposal or proposal.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Proposal section not found")
     return proposal
